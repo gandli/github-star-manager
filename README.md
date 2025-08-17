@@ -1,4 +1,4 @@
-# 我的GitHub Star项目
+# 我的GitHub Star项目 [![Update Starred Repos](https://github.com/gandli/github-star-manager/actions/workflows/update_stars.yml/badge.svg)](https://github.com/gandli/github-star-manager/actions/workflows/update_stars.yml)
 
 最后更新: 未更新
 
