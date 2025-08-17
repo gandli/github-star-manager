@@ -6,6 +6,7 @@
 
 - 自动获取您的GitHub Star项目列表
 - 支持增量更新模式，只获取最新的Star项目
+- 内置请求重试机制，解决GitHub API偶尔超时问题
 - 使用AI对项目进行智能分类
 - 生成项目摘要和关键特性
 - 定期更新README文件，保持项目列表最新
@@ -103,6 +104,13 @@
 - `categories`: 自定义分类类别
 - `max_stars`: 最大获取的Star项目数量（默认为5000）。如果您的Star项目数量超过此值，请增加此配置以获取所有项目。例如，对于有4000多个Star项目的用户，建议设置为5000或更高
 - `incremental_update`: 是否启用增量更新模式（默认为true）。启用后，每次更新只获取最新的Star项目，而不是全量更新
+
+### 网络请求配置
+- `request_timeout`: 请求超时时间（秒），默认为30秒
+- `max_retries`: 最大重试次数，默认为3次
+- `retry_delay`: 初始重试延迟（秒），默认为5秒。每次重试失败后，延迟时间会翻倍（指数退避策略）
+
+### AI配置
 - `ai_model`: 使用的AI模型
 - `ai_api_url`: AI API地址
 
@@ -120,6 +128,10 @@
    - 检查GitHub Token是否有效
    - 确认Token有`repo`和`user`权限
    - 检查GitHub API限流情况
+   - 如果遇到504超时错误，可以尝试以下解决方案：
+     - 在`config.yaml`中增加`request_timeout`值（例如60秒）
+     - 增加`max_retries`值（例如5次）
+     - 减小`max_stars`值，分批获取项目
 
 2. **AI分类失败**
    - 检查AI API密钥是否有效

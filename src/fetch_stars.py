@@ -25,7 +25,7 @@ def load_config():
         sys.exit(1)
 
 
-def fetch_starred_repos(username, token, max_stars=100, incremental=True):
+def fetch_starred_repos(username, token, max_stars=100, incremental=True, request_timeout=30, max_retries=3, retry_delay=5):
     """
     获取用户的Star项目列表
     
@@ -34,6 +34,9 @@ def fetch_starred_repos(username, token, max_stars=100, incremental=True):
         token: GitHub访问令牌
         max_stars: 最大获取数量
         incremental: 是否增量更新（只获取最新的Star项目）
+        request_timeout: 请求超时时间（秒）
+        max_retries: 最大重试次数
+        retry_delay: 初始重试延迟（秒）
         
     Returns:
         list: 项目列表
@@ -70,11 +73,39 @@ def fetch_starred_repos(username, token, max_stars=100, incremental=True):
     while len(all_repos) < max_stars:
         print(f"正在获取第{page}页数据 (每页{per_page}条)...")
         url = f"https://api.github.com/users/{username}/starred?page={page}&per_page={per_page}"
-        response = requests.get(url, headers=headers)
         
+        # 添加重试机制
+        for retry in range(max_retries):
+            try:
+                response = requests.get(url, headers=headers, timeout=request_timeout)  # 使用配置的超时时间
+                
+                if response.status_code == 200:
+                    break  # 请求成功，跳出重试循环
+                elif response.status_code == 504 or response.status_code >= 500:  # 服务器错误，可以重试
+                    if retry < max_retries - 1:  # 如果不是最后一次重试
+                        print(f"获取第{page}页数据失败: {response.status_code} - 服务器错误，{retry_delay}秒后重试({retry+1}/{max_retries})")
+                        import time
+                        time.sleep(retry_delay)  # 等待一段时间后重试
+                        retry_delay *= 2  # 指数退避策略，每次重试延迟时间翻倍
+                        continue
+                # 其他错误或最后一次重试失败
+                print(f"获取Star项目失败: {response.status_code} - {response.text}")
+                break
+            except requests.exceptions.RequestException as e:
+                if retry < max_retries - 1:  # 如果不是最后一次重试
+                    print(f"请求异常: {e}，{retry_delay}秒后重试({retry+1}/{max_retries})")
+                    import time
+                    time.sleep(retry_delay)
+                    retry_delay *= 2  # 指数退避策略
+                    continue
+                print(f"请求异常: {e}，重试次数已用完")
+                break
+        
+        # 检查是否成功获取数据
         if response.status_code != 200:
-            print(f"获取Star项目失败: {response.status_code} - {response.text}")
-            break
+            print(f"获取第{page}页数据失败，跳过此页继续获取下一页")
+            page += 1
+            continue  # 跳过此页，继续获取下一页
             
         repos = response.json()
         if not repos:  # 没有更多项目
@@ -200,7 +231,21 @@ def main():
     else:
         print("使用全量更新模式，获取所有Star项目")
     
-    repos = fetch_starred_repos(username, github_token, max_stars, incremental_update)
+    # 从配置文件中读取网络请求相关的配置
+    request_timeout = config.get('request_timeout', 30)
+    max_retries = config.get('max_retries', 3)
+    retry_delay = config.get('retry_delay', 5)
+    print(f"网络请求配置：超时时间={request_timeout}秒，最大重试次数={max_retries}，初始重试延迟={retry_delay}秒")
+    
+    repos = fetch_starred_repos(
+        username, 
+        github_token, 
+        max_stars, 
+        incremental_update,
+        request_timeout,
+        max_retries,
+        retry_delay
+    )
     
     # 如果是增量更新且有新项目，则合并新旧项目列表
     if incremental_update and repos:

@@ -5,6 +5,11 @@ update_interval: 7    # 更新频率（天）
 max_stars: 9999        # 最大获取的Star项目数量
 incremental_update: true  # 是否使用增量更新模式（只获取最新的Star项目）
 
+# 网络请求配置
+request_timeout: 30    # 请求超时时间（秒）
+max_retries: 3         # 最大重试次数
+retry_delay: 5         # 初始重试延迟（秒）
+
 # AI配置
 ai_model: "glm-4.5-flash"  # 使用的AI模型
 ai_api_url: "https://open.bigmodel.cn/api/paas/v4/chat/completions"  # AI API地址

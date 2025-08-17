@@ -10,9 +10,9 @@ on:
   workflow_dispatch:
 
   # 当配置文件更改时运行
-  push:
-    paths:
-      - "config.yaml"
+  # push:
+  #   paths:
+  #     - "config.yaml"
 
 jobs:
   update-stars:
