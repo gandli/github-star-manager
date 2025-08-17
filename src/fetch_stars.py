@@ -98,9 +98,9 @@ def save_repos_to_file(repos, output_file):
 
 def main():
     # 获取GitHub Token
-    github_token = os.environ.get('GH_TOKEN')
+    github_token = os.environ.get('GH_PAT')
     if not github_token:
-        print("错误: 未设置GH_TOKEN环境变量")
+        print("错误: 未设置GH_PAT环境变量")
         sys.exit(1)
     
     # 加载配置

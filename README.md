@@ -10,25 +10,66 @@
 - 定期更新README文件，保持项目列表最新
 - 完全基于GitHub Actions自动化运行
 
+## 工作原理
+
+1. 通过GitHub API获取用户的Star项目列表
+2. 使用AI模型（默认为智谱AI的GLM-4.5-Flash）对项目进行分类和摘要生成
+3. 将分类结果更新到README.md文件中
+4. 通过GitHub Actions定期自动运行，保持项目列表最新
+
 ## 使用方法
+
+### 在GitHub上部署
 
 1. Fork本仓库
 2. 在仓库设置中添加以下Secrets:
-   - `GH_TOKEN`: GitHub个人访问令牌，需要有`repo`和`user`权限
+   - `GH_PAT`: GitHub个人访问令牌，需要有`repo`和`user`权限
    - `AI_API_KEY`: AI API密钥（用于智能分类和摘要生成）
-3. 修改配置文件中的用户名为您的GitHub用户名
+3. 修改`config.yaml`文件中的`username`为您的GitHub用户名
 4. 启用GitHub Actions
+
+### 本地运行
+
+1. 克隆仓库
+   ```bash
+   git clone https://github.com/YOUR_USERNAME/github-star-manager.git
+   cd github-star-manager
+   ```
+
+2. 安装依赖
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+3. 设置环境变量
+   ```bash
+   # Linux/macOS
+   export GH_PAT=your_github_token
+   export AI_API_KEY=your_ai_api_key
+   
+   # Windows (PowerShell)
+   $env:GH_PAT="your_github_token"
+   $env:AI_API_KEY="your_ai_api_key"
+   ```
+
+4. 运行脚本
+   ```bash
+   python run_local.py
+   ```
 
 ## 项目结构
 
 ```
 .
 ├── .github/workflows/  # GitHub Actions工作流配置
+├── data/               # 数据存储目录
 ├── src/                # 源代码
 │   ├── fetch_stars.py  # 获取Star项目列表
 │   ├── classify.py     # 项目分类和摘要生成
 │   └── update_readme.py # 更新README文件
 ├── config.yaml         # 配置文件
+├── requirements.txt    # 项目依赖
+├── run_local.py        # 本地运行脚本
 └── README.md           # 项目说明文档
 ```
 
@@ -40,6 +81,43 @@
 - `update_interval`: 更新频率（天）
 - `categories`: 自定义分类类别
 - `max_stars`: 最大获取的Star项目数量
+- `ai_model`: 使用的AI模型
+- `ai_api_url`: AI API地址
+
+## 自定义AI模型
+
+默认使用智谱AI的GLM-4.5-Flash模型，您可以在`config.yaml`中修改`ai_model`和`ai_api_url`来使用其他AI模型。
+
+如果您想使用其他AI服务，需要修改`src/classify.py`中的`call_ai_api`函数，以适配不同的API格式。
+
+## 故障排除
+
+### 常见问题
+
+1. **获取Star项目失败**
+   - 检查GitHub Token是否有效
+   - 确认Token有`repo`和`user`权限
+   - 检查GitHub API限流情况
+
+2. **AI分类失败**
+   - 检查AI API密钥是否有效
+   - 确认API URL是否正确
+   - 查看API调用日志获取详细错误信息
+
+3. **GitHub Actions未运行**
+   - 检查是否启用了GitHub Actions
+   - 确认Secrets是否正确设置
+   - 查看Actions日志获取详细错误信息
+
+## 贡献指南
+
+欢迎贡献代码、报告问题或提出改进建议！
+
+1. Fork本仓库
+2. 创建您的特性分支 (`git checkout -b feature/amazing-feature`)
+3. 提交您的更改 (`git commit -m 'Add some amazing feature'`)
+4. 推送到分支 (`git push origin feature/amazing-feature`)
+5. 创建一个Pull Request
 
 ## Star项目列表
 
