@@ -19,7 +19,7 @@ class AIProcessor:
         Args:
             api_key: GitHub API密钥，如果为None则从环境变量获取
         """
-        self.api_key = api_key or os.getenv("GH_TOKEN")
+        self.api_key = os.getenv("GH_TOKEN")
         if not self.api_key:
             logger.warning("未设置GitHub AI API密钥，将使用启发式方法进行分类")
 
@@ -69,45 +69,45 @@ class AIProcessor:
 
     def _call_github_ai(self, prompt: str) -> str:
         """调用GitHub AI API
-        
+
         Args:
             prompt: 提示词
-            
+
         Returns:
             AI响应
         """
         if not self.api_key:
             logger.warning("未设置API密钥，无法调用AI服务")
             return ""
-            
+
         try:
             logger.debug(f"准备调用AI API，提示词长度: {len(prompt)}")
-            
+
             headers = {
                 "Authorization": f"Bearer {self.api_key}",
                 "Content-Type": "application/json",
-                "Accept": "application/json"
+                "Accept": "application/json",
             }
-            
+
             data = {
                 "model": "github-copilot",  # 使用GitHub Copilot模型
                 "prompt": prompt,
                 "max_tokens": 300,
-                "temperature": 0.5
+                "temperature": 0.5,
             }
-            
+
             logger.debug("发送API请求")
             response = requests.post(
                 "https://api.github.com/copilot/completions",
                 headers=headers,
                 json=data,
-                timeout=30  # 设置超时时间
+                timeout=30,  # 设置超时时间
             )
-            
+
             if response.status_code != 200:
                 logger.error(f"API调用失败: {response.status_code} - {response.text}")
                 raise Exception(f"API调用失败: {response.status_code}")
-            
+
             result = response.json()
             response_text = result.get("choices", [{}])[0].get("text", "")
             logger.debug(f"API调用成功，响应长度: {len(response_text)}")

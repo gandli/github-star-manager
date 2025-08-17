@@ -15,6 +15,8 @@ logger = setup_logging()
 def init_github_client():
     token = os.getenv('GH_TOKEN') 
     if not token:
+        token = os.getenv('GH_PAT')
+    if not token:
         logger.error("未设置GH_TOKEN或GH_PAT环境变量")
         raise ValueError("未设置GH_TOKEN或GH_PAT环境变量")
     return Github(token)
