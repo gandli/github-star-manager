@@ -1,5 +1,6 @@
 from github import Github
 import os
+import sys
 import json
 import logging
 import traceback
@@ -35,21 +36,20 @@ def get_starred_repos(g):
         
         # 使用分页参数获取star项目
         try:
-            # 尝试获取带有starred_at时间戳的数据
-            # 需要设置特殊的Accept头，但PyGithub不直接支持，所以这里使用原始API
-            starred = user.get_starred(sort="created", direction="desc")
-            logger.info(f"成功获取star项目列表，使用标准API")
-        except Exception as e:
-            logger.warning(f"使用标准API获取star项目失败，回退到基本方法: {str(e)}")
+            # PyGithub的get_starred()方法不支持sort和direction参数
+            # 直接使用基本方法获取star项目
             starred = user.get_starred()
+            logger.info(f"成功获取star项目列表")
+        except Exception as e:
+            logger.error(f"获取star项目失败: {str(e)}")
+            raise
         
         # 记录总数
-        try:
-            total_count = starred.totalCount
-            logger.info(f"共找到 {total_count} 个star项目")
-        except Exception as e:
-            logger.warning(f"无法获取star项目总数: {str(e)}")
-            total_count = "未知"
+        # PyGithub的PaginatedList对象没有totalCount属性，需要手动计算
+        total_count = len(list(starred))
+        logger.info(f"共找到 {total_count} 个star项目")
+        # 重新获取starred列表，因为上面的操作已经遍历了整个列表
+        starred = user.get_starred()
         
         # 分页获取所有项目
         repos = []
@@ -86,13 +86,25 @@ def get_starred_repos(g):
                 retry_count = 0  # 重置重试计数
                 
             except Exception as e:
+                error_message = str(e)
                 retry_count += 1
+                
+                # 检查是否是API速率限制错误
+                if "API rate limit exceeded" in error_message:
+                    # 计算更智能的等待时间
+                    wait_time = retry_delay * (2 ** (retry_count - 1))  # 指数退避策略
+                    wait_time = min(wait_time, 120)  # 最长等待2分钟
+                    
+                    logger.warning(f"API速率限制，等待 {wait_time} 秒后重试")
+                    time.sleep(wait_time)
+                    continue
+                
                 if retry_count > max_retries:
-                    logger.error(f"获取第 {page+1} 页star项目失败，已达到最大重试次数: {str(e)}")
+                    logger.error(f"获取第 {page+1} 页star项目失败，已达到最大重试次数: {error_message}")
                     break
                 
-                logger.warning(f"获取第 {page+1} 页star项目失败，第 {retry_count} 次重试: {str(e)}")
-                time.sleep(retry_delay)  # 等待一段时间后重试
+                logger.warning(f"获取第 {page+1} 页star项目失败，第 {retry_count} 次重试: {error_message}")
+                time.sleep(retry_delay * retry_count)  # 递增等待时间
         
         logger.info(f"获取到 {len(repos)} 个star项目")
         return repos
@@ -447,27 +459,46 @@ if __name__ == "__main__":
         ai_token = os.getenv("GH_TOKEN")
         if not ai_token:
             logger.warning("未设置GH_TOKEN环境变量，将使用启发式分类方法")
-        ai_processor = AIProcessor(ai_token)
+        
+        try:
+            ai_processor = AIProcessor(ai_token)
+            logger.info("AI处理器初始化成功")
+        except Exception as e:
+            logger.error(f"AI处理器初始化失败: {str(e)}")
+            logger.warning("将使用默认分类方法")
+            # 创建一个简单的替代处理器
+            class SimpleProcessor:
+                def classify_repository(self, repo):
+                    return "未分类"
+                def generate_summary(self, repo):
+                    return repo.get('description', '') or '无描述'
+            ai_processor = SimpleProcessor()
         
         # 初始化GitHub客户端并获取star项目
         logger.info("初始化GitHub客户端")
-        g = init_github_client()
+        try:
+            g = init_github_client()
+            logger.info("GitHub客户端初始化成功")
+        except Exception as e:
+            logger.error(f"GitHub客户端初始化失败: {str(e)}")
+            raise  # GitHub客户端初始化失败是致命错误，无法继续
         
         logger.info("获取star项目列表")
-        starred_repos = get_starred_repos(g)
+        try:
+            starred_repos = get_starred_repos(g)
+            logger.info("star项目列表获取成功")
+        except Exception as e:
+            logger.error(f"获取star项目列表失败: {str(e)}")
+            raise  # 获取star项目失败是致命错误，无法继续
         
         # 收集仓库数据
         repos_data = []
         processed_count = 0
         error_count = 0
         
-        # 获取总数
-        try:
-            total_repos = starred_repos.totalCount
-            logger.info(f"共找到 {total_repos} 个star项目")
-        except Exception as e:
-            logger.warning(f"无法获取star项目总数: {str(e)}")
-            total_repos = "未知"
+        # 获取总数 - starred_repos 是列表，没有 totalCount 属性
+        total_repos = len(starred_repos)
+        logger.info(f"共找到 {total_repos} 个star项目")
         
         # 处理所有仓库数据
         logger.info("开始处理仓库数据")
@@ -480,14 +511,28 @@ if __name__ == "__main__":
             try:
                 # 报告进度
                 if i > 0 and i % progress_interval == 0:
-                    logger.info(f"已处理 {i} 个仓库，总计 {total_repos} ({i/float(total_repos)*100:.1f}%)")
+                    # 避免除零错误和确保总数是数字
+                    if isinstance(total_repos, (int, float)) and total_repos > 0:
+                        percentage = (i / float(total_repos)) * 100
+                        logger.info(f"已处理 {i} 个仓库，总计 {total_repos} ({percentage:.1f}%)")
+                    else:
+                        logger.info(f"已处理 {i} 个仓库")
                 
                 # 转换为字典并处理
                 repo_dict = repo_to_dict(repo)
                 
-                # 使用AI处理器进行分类和摘要生成
-                repo_dict["category"] = ai_processor.classify_repository(repo_dict)
-                repo_dict["summary"] = ai_processor.generate_summary(repo_dict)
+                # 使用AI处理器进行分类和摘要生成，添加错误处理
+                try:
+                    repo_dict["category"] = ai_processor.classify_repository(repo_dict)
+                except Exception as e:
+                    logger.warning(f"AI分类仓库 {repo_dict.get('name', '未知')} 失败: {str(e)}")
+                    repo_dict["category"] = "未分类"
+                
+                try:
+                    repo_dict["summary"] = ai_processor.generate_summary(repo_dict)
+                except Exception as e:
+                    logger.warning(f"AI生成摘要 {repo_dict.get('name', '未知')} 失败: {str(e)}")
+                    repo_dict["summary"] = repo_dict.get('description', '') or '无描述'
                 
                 # 添加到数据列表
                 repos_data.append(repo_dict)
@@ -517,18 +562,51 @@ if __name__ == "__main__":
             logger.info(f"仓库数据已保存到 {data_file}")
         except Exception as e:
             logger.error(f"保存仓库数据时出错: {str(e)}")
+            # 继续执行，不中断流程
         
         # 更新README
         logger.info("开始更新README")
-        update_readme(repos_data, ai_processor)
+        readme_updated = False
+        try:
+            update_readme(repos_data, ai_processor)
+            logger.info("README更新成功")
+            readme_updated = True
+        except Exception as e:
+            logger.error(f"更新README时出错: {str(e)}")
+            # 尝试使用基本方式更新
+            try:
+                logger.info("尝试使用基本方式更新README")
+                _update_readme_basic(repos_data)
+                logger.info("使用基本方式更新README成功")
+                readme_updated = True
+            except Exception as e2:
+                logger.error(f"基本方式更新README也失败: {str(e2)}")
+                # 这里可以添加更多的回退策略
+        
+        # 报告执行统计
+        logger.info("===== 执行统计 =====")
+        logger.info(f"处理仓库总数: {total_repos}")
+        logger.info(f"成功处理: {processed_count}")
+        logger.info(f"处理失败: {error_count}")
+        logger.info(f"README更新: {'成功' if readme_updated else '失败'}")
+        logger.info("===================")
         
         # 报告AI处理器缓存统计
-        if hasattr(ai_processor, 'get_cache_stats'):
-            cache_stats = ai_processor.get_cache_stats()
-            logger.info(f"AI处理器缓存统计: {cache_stats}")
+        try:
+            if hasattr(ai_processor, 'get_cache_stats'):
+                cache_stats = ai_processor.get_cache_stats()
+                if cache_stats:
+                    logger.info(f"AI处理器缓存统计: {cache_stats}")
+        except Exception as e:
+            logger.warning(f"获取AI处理器缓存统计失败: {str(e)}")
         
-        logger.info("处理完成")
+        logger.info("GitHub Star项目自动管理系统执行完成")
     except Exception as e:
         logger.error(f"程序执行出错: {str(e)}")
-        logger.error(traceback.format_exc())
-        raise
+        import traceback
+        logger.error(f"错误详情: {traceback.format_exc()}")
+        logger.info("GitHub Star项目自动管理系统异常退出")
+        sys.exit(1)  # 返回非零状态码表示错误
+    else:
+        logger.info("GitHub Star项目自动管理系统正常退出")
+        sys.exit(0)  # 返回零状态码表示成功

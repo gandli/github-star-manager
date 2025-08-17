@@ -8,6 +8,11 @@ on:
 jobs:
   update-stars:
     runs-on: ubuntu-latest
+    
+    # 添加权限设置，允许使用GitHub Models API
+    permissions:
+      contents: write  # 用于提交更改
+      models: read     # 用于访问GitHub Models API
 
     steps:
       - uses: actions/checkout@v3
@@ -20,7 +25,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install PyGithub python-dotenv requests logging
+          pip install PyGithub==1.59.1 python-dotenv requests
 
       - name: Run star updater
         env:
