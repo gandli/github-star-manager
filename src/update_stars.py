@@ -500,21 +500,27 @@ if __name__ == "__main__":
         total_repos = len(starred_repos)
         logger.info(f"共找到 {total_repos} 个star项目")
         
-        # 处理所有仓库数据
+        # 只处理最新的10个仓库数据
+        # 按照starred_at时间排序，获取最新的10个
+        latest_repos = sorted(starred_repos, key=lambda r: r.updated_at if hasattr(r, 'updated_at') else datetime.now(), reverse=True)[:10]
+        logger.info(f"将只处理最新的10个star项目进行测试")
+        
+        # 处理选定的仓库数据
         logger.info("开始处理仓库数据")
         
         # 设置进度报告间隔
         progress_interval = config.get("processing", {}).get("progress_interval", 10)  # 每处理10个仓库报告一次进度
         
-        # 使用分页方式处理仓库
-        for i, repo in enumerate(starred_repos):
+        # 使用分页方式处理最新的10个仓库
+        for i, repo in enumerate(latest_repos):
             try:
                 # 报告进度
                 if i > 0 and i % progress_interval == 0:
                     # 避免除零错误和确保总数是数字
-                    if isinstance(total_repos, (int, float)) and total_repos > 0:
-                        percentage = (i / float(total_repos)) * 100
-                        logger.info(f"已处理 {i} 个仓库，总计 {total_repos} ({percentage:.1f}%)")
+                    latest_total = len(latest_repos)
+                    if isinstance(latest_total, (int, float)) and latest_total > 0:
+                        percentage = (i / float(latest_total)) * 100
+                        logger.info(f"已处理 {i} 个仓库，总计 {latest_total} ({percentage:.1f}%)")
                     else:
                         logger.info(f"已处理 {i} 个仓库")
                 
@@ -522,17 +528,59 @@ if __name__ == "__main__":
                 repo_dict = repo_to_dict(repo)
                 
                 # 使用AI处理器进行分类和摘要生成，添加错误处理
-                try:
-                    repo_dict["category"] = ai_processor.classify_repository(repo_dict)
-                except Exception as e:
-                    logger.warning(f"AI分类仓库 {repo_dict.get('name', '未知')} 失败: {str(e)}")
-                    repo_dict["category"] = "未分类"
+                # 添加API速率限制处理
+                import time
+                max_retries = config["github"]["max_retries"]
+                retry_count = 0
                 
-                try:
-                    repo_dict["summary"] = ai_processor.generate_summary(repo_dict)
-                except Exception as e:
-                    logger.warning(f"AI生成摘要 {repo_dict.get('name', '未知')} 失败: {str(e)}")
-                    repo_dict["summary"] = repo_dict.get('description', '') or '无描述'
+                # 分类仓库
+                while retry_count <= max_retries:
+                    try:
+                        repo_dict["category"] = ai_processor.classify_repository(repo_dict)
+                        break  # 成功则跳出循环
+                    except Exception as e:
+                        error_message = str(e)
+                        retry_count += 1
+                        
+                        # 检查是否是API速率限制错误
+                        if "API rate limit exceeded" in error_message or "429" in error_message:
+                            # 计算更智能的等待时间
+                            wait_time = min(5 * (2 ** (retry_count - 1)), 60)  # 指数退避策略，最长等待60秒
+                            
+                            logger.warning(f"AI分类API速率限制，等待 {wait_time} 秒后重试 ({retry_count}/{max_retries})")
+                            time.sleep(wait_time)
+                        else:
+                            # 其他错误，记录后继续
+                            logger.warning(f"AI分类仓库 {repo_dict.get('name', '未知')} 失败: {error_message}")
+                            if retry_count >= max_retries:
+                                repo_dict["category"] = "未分类"
+                                break
+                            time.sleep(2)  # 短暂等待后重试
+                
+                # 生成摘要
+                retry_count = 0
+                while retry_count <= max_retries:
+                    try:
+                        repo_dict["summary"] = ai_processor.generate_summary(repo_dict)
+                        break  # 成功则跳出循环
+                    except Exception as e:
+                        error_message = str(e)
+                        retry_count += 1
+                        
+                        # 检查是否是API速率限制错误
+                        if "API rate limit exceeded" in error_message or "429" in error_message:
+                            # 计算更智能的等待时间
+                            wait_time = min(5 * (2 ** (retry_count - 1)), 60)  # 指数退避策略，最长等待60秒
+                            
+                            logger.warning(f"AI摘要API速率限制，等待 {wait_time} 秒后重试 ({retry_count}/{max_retries})")
+                            time.sleep(wait_time)
+                        else:
+                            # 其他错误，记录后继续
+                            logger.warning(f"AI生成摘要 {repo_dict.get('name', '未知')} 失败: {error_message}")
+                            if retry_count >= max_retries:
+                                repo_dict["summary"] = repo_dict.get('description', '') or '无描述'
+                                break
+                            time.sleep(2)  # 短暂等待后重试
                 
                 # 添加到数据列表
                 repos_data.append(repo_dict)
@@ -585,8 +633,9 @@ if __name__ == "__main__":
         
         # 报告执行统计
         logger.info("===== 执行统计 =====")
-        logger.info(f"处理仓库总数: {total_repos}")
-        logger.info(f"成功处理: {processed_count}")
+        logger.info(f"仓库总数: {total_repos}")
+        logger.info(f"处理最新的仓库数: {len(latest_repos)}")
+        logger.info(f"成功处理: {processed_count - error_count}")
         logger.info(f"处理失败: {error_count}")
         logger.info(f"README更新: {'成功' if readme_updated else '失败'}")
         logger.info("===================")

@@ -173,11 +173,11 @@ class AIProcessor:
 
                 # 处理速率限制
                 if response.status_code == 429:
-                    # 使用指数退避策略
+                    # 使用更智能的指数退避策略
                     retry_after = int(response.headers.get("Retry-After", retry_delay))
-                    wait_time = retry_after * (2 ** attempt)  # 指数退避
-                    wait_time = min(wait_time, 300)  # 最长等待5分钟
-                    logger.warning(f"API速率限制，等待 {wait_time} 秒后重试")
+                    # 使用较小的基数和指数，避免等待时间过长
+                    wait_time = min(retry_after * (1.5 ** attempt), 60)  # 指数退避，最长等待60秒
+                    logger.warning(f"API速率限制，等待 {wait_time:.1f} 秒后重试 (尝试 {attempt+1}/{max_retries})")
                     time.sleep(wait_time)
                     continue
                     
@@ -187,15 +187,16 @@ class AIProcessor:
                     logger.error(error_msg)
                     
                     if attempt < max_retries - 1:
-                        # 使用递增的重试延迟
-                        current_delay = retry_delay * (attempt + 1)
-                        logger.info(f"将在 {current_delay} 秒后重试，剩余尝试次数: {max_retries - attempt - 1}")
+                        # 使用更短的递增重试延迟
+                        current_delay = min(retry_delay * (1.5 ** attempt), 30)  # 最长等待30秒
+                        logger.info(f"将在 {current_delay:.1f} 秒后重试，剩余尝试次数: {max_retries - attempt - 1}")
                         time.sleep(current_delay)
                         continue
                     else:
                         # 记录详细错误信息
                         logger.error(f"API调用失败，已达到最大重试次数。状态码: {response.status_code}，响应: {response.text[:200]}...")
-                        raise Exception(error_msg)
+                        # 返回空结果而不是抛出异常，避免中断整个流程
+                        return ""
 
                 result = response.json()
                 response_text = result.get("choices", [{}])[0].get("message", {}).get("content", "")
@@ -205,9 +206,9 @@ class AIProcessor:
             except requests.exceptions.Timeout:
                 logger.error(f"API调用超时，尝试次数: {attempt + 1}/{max_retries}")
                 if attempt < max_retries - 1:
-                    # 使用递增的重试延迟
-                    current_delay = retry_delay * (attempt + 1)
-                    logger.info(f"将在 {current_delay} 秒后重试")
+                    # 使用更短的递增重试延迟
+                    current_delay = min(retry_delay * (1.5 ** attempt), 20)  # 最长等待20秒
+                    logger.info(f"将在 {current_delay:.1f} 秒后重试")
                     time.sleep(current_delay)
                 else:
                     logger.error("API调用超时，已达到最大重试次数")
@@ -217,9 +218,9 @@ class AIProcessor:
             except requests.exceptions.RequestException as e:
                 logger.error(f"API请求异常: {str(e)}，尝试次数: {attempt + 1}/{max_retries}")
                 if attempt < max_retries - 1:
-                    # 使用递增的重试延迟
-                    current_delay = retry_delay * (attempt + 1)
-                    logger.info(f"将在 {current_delay} 秒后重试")
+                    # 使用更短的递增重试延迟
+                    current_delay = min(retry_delay * (1.5 ** attempt), 20)  # 最长等待20秒
+                    logger.info(f"将在 {current_delay:.1f} 秒后重试")
                     time.sleep(current_delay)
                 else:
                     logger.error(traceback.format_exc())
@@ -229,9 +230,9 @@ class AIProcessor:
             except Exception as e:
                 logger.error(f"调用AI API时发生未知错误: {str(e)}，尝试次数: {attempt + 1}/{max_retries}")
                 if attempt < max_retries - 1:
-                    # 使用递增的重试延迟
-                    current_delay = retry_delay * (attempt + 1)
-                    logger.info(f"将在 {current_delay} 秒后重试")
+                    # 使用更短的递增重试延迟
+                    current_delay = min(retry_delay * (1.5 ** attempt), 20)  # 最长等待20秒
+                    logger.info(f"将在 {current_delay:.1f} 秒后重试")
                     time.sleep(current_delay)
                 else:
                     logger.error(traceback.format_exc())

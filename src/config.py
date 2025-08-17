@@ -12,8 +12,8 @@ CONFIG = {
         ),  # GitHub用户名，如果为空则从token获取
         "api_base_url": "https://api.github.com",
         "per_page": 100,  # 每页获取的仓库数量，最大为100
-        "max_retries": 3,  # API调用失败时的最大重试次数
-        "retry_delay": 5,  # 重试间隔（秒）
+        "max_retries": 5,  # API调用失败时的最大重试次数
+        "retry_delay": 2,  # 初始重试间隔（秒）
     },
     # AI处理配置
     "ai": {
@@ -22,7 +22,7 @@ CONFIG = {
         "model": "openai/gpt-4.1",
         "max_tokens": 300,
         "temperature": 0.5,
-        "timeout": 30,  # API调用超时时间（秒）
+        "timeout": 20,  # API调用超时时间（秒）
     },
     # 数据存储配置
     "storage": {
