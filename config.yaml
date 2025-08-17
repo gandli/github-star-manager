@@ -1,7 +1,6 @@
 # GitHub Star Manager配置文件
 
 # 基本配置
-username: "gandli"  # 本地运行时的GitHub用户名，也可通过环境变量GITHUB_USERNAME设置。在GitHub Actions环境中，工作流默认使用github.repository_owner（仓库所有者）作为GITHUB_USERNAME环境变量的值，也可以在工作流中修改为其他值（如github.actor获取当前触发工作流的用户）
 update_interval: 7    # 更新频率（天）
 max_stars: 100        # 最大获取的Star项目数量
 
