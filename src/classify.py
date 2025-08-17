@@ -37,7 +37,7 @@ def load_repos(input_file):
         sys.exit(1)
 
 
-def call_ai_api(api_key, api_url, model, prompt):
+def call_ai_api(api_key, api_url, model, prompt, max_retries=3, retry_delay=5):
     """
     调用AI API进行项目分类和摘要生成
     
@@ -46,10 +46,14 @@ def call_ai_api(api_key, api_url, model, prompt):
         api_url: API地址
         model: 模型名称
         prompt: 提示词
+        max_retries: 最大重试次数
+        retry_delay: 重试间隔（秒）
         
     Returns:
         str: AI生成的回复
     """
+    import time
+    
     headers = {
         'Authorization': f'Bearer {api_key}',
         'Content-Type': 'application/json'
@@ -69,16 +73,42 @@ def call_ai_api(api_key, api_url, model, prompt):
         ]
     }
     
-    try:
-        response = requests.post(api_url, headers=headers, json=data)
-        response.raise_for_status()
-        result = response.json()
-        return result['choices'][0]['message']['content']
-    except Exception as e:
-        print(f"调用AI API失败: {e}")
-        if hasattr(e, 'response') and hasattr(e.response, 'text'):
-            print(f"响应内容: {e.response.text}")
-        return None
+    for attempt in range(max_retries):
+        try:
+            # 添加请求间隔，避免并发过高
+            if attempt > 0:
+                print(f"等待{retry_delay}秒后进行第{attempt+1}次重试...")
+                time.sleep(retry_delay)
+                # 每次重试增加等待时间，避免连续失败
+                retry_delay *= 1.5
+            
+            response = requests.post(api_url, headers=headers, json=data)
+            response.raise_for_status()
+            result = response.json()
+            return result['choices'][0]['message']['content']
+        except requests.exceptions.HTTPError as e:
+            # 特别处理429错误（请求过多）
+            if hasattr(e, 'response') and e.response.status_code == 429:
+                print(f"API请求过多(429)，第{attempt+1}次重试...")
+                if attempt == max_retries - 1:  # 最后一次重试
+                    print(f"达到最大重试次数({max_retries})，放弃请求")
+                    if hasattr(e, 'response') and hasattr(e.response, 'text'):
+                        print(f"响应内容: {e.response.text}")
+                    return None
+                # 对于429错误，增加更长的等待时间
+                time.sleep(retry_delay * 2)
+            else:
+                print(f"调用AI API失败: {e}")
+                if hasattr(e, 'response') and hasattr(e.response, 'text'):
+                    print(f"响应内容: {e.response.text}")
+                return None
+        except Exception as e:
+            print(f"调用AI API失败: {e}")
+            if hasattr(e, 'response') and hasattr(e.response, 'text'):
+                print(f"响应内容: {e.response.text}")
+            return None
+    
+    return None
 
 
 def generate_repo_prompt(repo, categories):
@@ -136,41 +166,86 @@ def parse_ai_response(response):
     }
 
 
-def classify_repos(repos, api_key, api_url, model, categories):
+def process_repo(repo, api_key, api_url, model, categories, request_interval=3):
+    """
+    处理单个项目
+    """
+    import time
+    
+    # 生成提示词
+    prompt = generate_repo_prompt(repo, categories)
+    
+    # 调用AI API
+    response = call_ai_api(api_key, api_url, model, prompt)
+    
+    if response:
+        # 解析结果
+        result = parse_ai_response(response)
+        
+        # 添加分类和摘要到项目信息中
+        repo_with_analysis = repo.copy()
+        repo_with_analysis['category'] = result.get('category', '其他')
+        repo_with_analysis['summary'] = result.get('summary', '无摘要')
+        repo_with_analysis['key_features'] = result.get('key_features', ['无特点'])
+        
+        print(f"成功处理: {repo['full_name']}")
+    else:
+        # 如果AI调用失败，使用默认值
+        repo_with_analysis = repo.copy()
+        repo_with_analysis['category'] = '其他'
+        repo_with_analysis['summary'] = '无法生成摘要'
+        repo_with_analysis['key_features'] = ['无法识别特点']
+        
+        print(f"处理失败: {repo['full_name']}，使用默认值")
+    
+    # 添加请求间隔，避免API并发过高
+    time.sleep(request_interval)
+    
+    return repo_with_analysis
+
+
+def classify_repos(repos, api_key, api_url, model, categories, request_interval=3, max_concurrent=2):
     """
     对项目列表进行分类和摘要生成
+    
+    Args:
+        repos: 项目列表
+        api_key: AI API密钥
+        api_url: API地址
+        model: 模型名称
+        categories: 分类列表
+        request_interval: 请求间隔（秒），避免API并发过高
+        max_concurrent: 最大并发数，限制同时处理的项目数量
     """
+    import time
+    import concurrent.futures
+    from threading import Lock
+    
     classified_repos = []
     total = len(repos)
+    print(f"开始处理{total}个项目，最大并发数: {max_concurrent}")
     
-    for i, repo in enumerate(repos):
-        print(f"正在处理 [{i+1}/{total}]: {repo['full_name']}")
+    # 使用线程池限制并发数
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_concurrent) as executor:
+        # 提交所有任务
+        future_to_repo = {executor.submit(process_repo, repo, api_key, api_url, model, categories, request_interval): repo 
+                         for repo in repos}
         
-        # 生成提示词
-        prompt = generate_repo_prompt(repo, categories)
-        
-        # 调用AI API
-        response = call_ai_api(api_key, api_url, model, prompt)
-        
-        if response:
-            # 解析结果
-            result = parse_ai_response(response)
-            
-            # 添加分类和摘要到项目信息中
-            repo_with_analysis = repo.copy()
-            repo_with_analysis['category'] = result.get('category', '其他')
-            repo_with_analysis['summary'] = result.get('summary', '无摘要')
-            repo_with_analysis['key_features'] = result.get('key_features', ['无特点'])
-            
-            classified_repos.append(repo_with_analysis)
-        else:
-            # 如果AI调用失败，使用默认值
-            repo_with_analysis = repo.copy()
-            repo_with_analysis['category'] = '其他'
-            repo_with_analysis['summary'] = '无法生成摘要'
-            repo_with_analysis['key_features'] = ['无法识别特点']
-            
-            classified_repos.append(repo_with_analysis)
+        # 收集结果
+        for i, future in enumerate(concurrent.futures.as_completed(future_to_repo)):
+            repo = future_to_repo[future]
+            try:
+                repo_with_analysis = future.result()
+                classified_repos.append(repo_with_analysis)
+                print(f"完成 [{i+1}/{total}]: {repo['full_name']}")
+            except Exception as e:
+                print(f"处理 {repo['full_name']} 时发生错误: {e}")
+                # 如果处理失败，使用默认值
+                repo_with_analysis = repo.copy()
+                repo_with_analysis['category'] = '其他'
+                repo_with_analysis['summary'] = '处理出错'
+                repo_with_analysis['key_features'] = ['处理过程中出错']
+                classified_repos.append(repo_with_analysis)
     
     return classified_repos
 
@@ -211,7 +286,9 @@ def main():
     print(f"已加载{len(repos)}个Star项目")
     
     # 对项目进行分类和摘要生成
-    classified_repos = classify_repos(repos, ai_api_key, ai_api_url, ai_model, categories)
+    # 设置较长的请求间隔和最大并发数为2，避免API并发限制
+    classified_repos = classify_repos(repos, ai_api_key, ai_api_url, ai_model, categories, 
+                                    request_interval=5, max_concurrent=2)
     
     # 保存结果
     timestamp = datetime.now().strftime('%Y%m%d')

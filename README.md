@@ -85,7 +85,7 @@
 - `username`: 您的GitHub用户名
 - `update_interval`: 更新频率（天）
 - `categories`: 自定义分类类别
-- `max_stars`: 最大获取的Star项目数量
+- `max_stars`: 最大获取的Star项目数量（默认为5000）。如果您的Star项目数量超过此值，请增加此配置以获取所有项目。例如，对于有4000多个Star项目的用户，建议设置为5000或更高
 - `ai_model`: 使用的AI模型
 - `ai_api_url`: AI API地址
 
