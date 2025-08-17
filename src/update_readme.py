@@ -111,11 +111,7 @@ def update_readme(content, readme_file):
 def main():
     # 加载配置
     config = load_config()
-    username = config.get('username')
-    
-    if username == "USERNAME":
-        print("错误: 请在config.yaml中设置您的GitHub用户名")
-        sys.exit(1)
+    username = config.get('GITHUB_USERNAME')
     
     # 加载分类后的项目列表
     data_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data')
