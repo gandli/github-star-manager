@@ -73,8 +73,15 @@
 ├── logs/                 # 日志文件目录
 ├── src/                  # 源代码
 │   ├── ai_processor.py   # AI处理模块
+│   ├── config.py         # 配置管理模块
 │   ├── logging_config.py # 日志配置
-│   └── update_stars.py   # 主程序
+│   ├── update_stars.py   # 主程序
+│   ├── test_ai_processor.py    # AI处理器测试
+│   ├── test_config.py          # 配置测试
+│   ├── test_github_api.py      # GitHub API测试
+│   ├── test_readme_generator.py # README生成测试
+│   ├── test_workflow.py        # 工作流程测试
+│   └── run_tests.py            # 运行所有测试的脚本
 ├── .env.example          # 环境变量示例
 ├── .gitignore            # Git忽略文件
 └── README.md             # 项目文档
@@ -83,3 +90,56 @@
 ### 项目分类
 
 [项目列表将在这里自动生成]
+
+## 优化内容
+
+### 1. GitHub API 调用优化
+
+- 支持分页获取 Star 项目，避免数据丢失
+- 增加不同排序方式支持（按创建时间、更新时间等）
+- 实现重试机制，处理 API 速率限制
+- 获取 `starred_at` 时间戳，记录 Star 时间
+- 增强错误处理，提高稳定性
+
+### 2. AI 处理器优化
+
+- 实现缓存机制，减少重复 API 调用
+- 增加缓存命中率统计和清除功能
+- 增强启发式分类，支持更多分类类型
+- 改进摘要生成，处理描述为空的情况
+- 增加重试机制，处理 AI API 速率限制
+
+### 3. 配置管理优化
+
+- 集中管理配置参数
+- 支持从环境变量加载敏感信息
+- 支持通过配置文件自定义设置
+- 实现配置合并功能
+
+### 4. README 生成优化
+
+- 支持自定义模板
+- 增加每个分类最大显示仓库数量配置
+- 支持自定义排序方式
+- 增强 Markdown 内容生成
+
+## 测试内容
+
+项目包含多个测试脚本，用于验证各个功能模块：
+
+- `test_config.py`: 测试配置加载和合并功能
+- `test_ai_processor.py`: 测试 AI 处理器的分类和摘要生成功能
+- `test_github_api.py`: 测试 GitHub API 的连接和获取 star 项目的功能
+- `test_readme_generator.py`: 测试 README 生成功能
+- `test_workflow.py`: 测试整个工作流程
+- `run_tests.py`: 运行所有测试的脚本
+
+### 运行测试
+
+```bash
+# 运行所有测试
+python src/run_tests.py
+
+# 运行特定测试
+python src/run_tests.py --test test_github_api
+```
