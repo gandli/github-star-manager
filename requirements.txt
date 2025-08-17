@@ -1,0 +1,8 @@
+# GitHub API交互
+PyGithub>=1.58.0
+
+# 环境变量管理
+python-dotenv>=1.0.0
+
+# HTTP请求
+requests>=2.31.0
