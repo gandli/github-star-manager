@@ -27,7 +27,9 @@
    - `AI_API_KEY`: AI API密钥（用于智能分类和摘要生成）
 3. 启用GitHub Actions
 
-> **注意**: 在GitHub Actions环境中，系统会自动获取仓库所有者的用户名，无需手动修改`config.yaml`文件中的`username`字段。如果您需要管理其他用户的Star项目，则需要手动修改该字段。
+> **注意**: 在GitHub Actions环境中，系统会自动获取仓库所有者的用户名，无需手动修改`config.yaml`文件中的`username`字段。如果您需要管理其他用户的Star项目，可以通过以下两种方式：
+> 1. 在GitHub Actions工作流中设置`GITHUB_USERNAME`环境变量（可以使用`${{ github.actor }}`获取当前触发工作流的用户名）
+> 2. 手动修改`config.yaml`文件中的`username`字段
 
 ### 本地运行
 
@@ -47,10 +49,12 @@
    # Linux/macOS
    export GH_PAT=your_github_token
    export AI_API_KEY=your_ai_api_key
+   export GITHUB_USERNAME=your_github_username  # 可选，覆盖config.yaml中的设置
    
    # Windows (PowerShell)
    $env:GH_PAT="your_github_token"
    $env:AI_API_KEY="your_ai_api_key"
+   $env:GITHUB_USERNAME="your_github_username"  # 可选，覆盖config.yaml中的设置
    ```
 
 4. 运行脚本

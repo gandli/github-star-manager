@@ -40,6 +40,7 @@ jobs:
         run: python src/fetch_stars.py
         env:
           GH_PAT: ${{ secrets.GH_PAT }}
+          GITHUB_USERNAME: ${{ github.repository_owner }}
 
       - name: 项目分类和摘要生成
         run: python src/classify.py
