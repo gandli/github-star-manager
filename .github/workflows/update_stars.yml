@@ -24,8 +24,7 @@ jobs:
 
       - name: Run star updater
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_AI_TOKEN: ${{ secrets.GITHUB_AI_TOKEN }} # GitHub AI API密钥
+          GH_TOKEN: ${{ secrets.GH_PAT }}
         run: python src/update_stars.py
 
       - name: Commit and push changes

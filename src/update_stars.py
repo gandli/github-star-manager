@@ -13,10 +13,10 @@ logger = setup_logging()
 
 # 初始化GitHub客户端
 def init_github_client():
-    token = os.getenv('GH_TOKEN')
+    token = os.getenv('GH_TOKEN') 
     if not token:
-        logger.error("未设置GH_TOKEN环境变量")
-        raise ValueError("未设置GH_TOKEN环境变量")
+        logger.error("未设置GH_TOKEN或GH_PAT环境变量")
+        raise ValueError("未设置GH_TOKEN或GH_PAT环境变量")
     return Github(token)
 
 # 获取用户star的项目
