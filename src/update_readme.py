@@ -41,29 +41,39 @@ def generate_readme_content(repos, username):
     """
     生成README内容
     """
+    print("开始生成README内容...")
     # 按分类组织项目
     categories = defaultdict(list)
     for repo in repos:
         categories[repo['category']].append(repo)
     
+    print(f"项目已分为{len(categories)}个类别")
+    
     # 读取现有的README文件
     readme_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'README.md')
     try:
+        print(f"正在读取现有README文件: {readme_file}")
         with open(readme_file, 'r', encoding='utf-8') as f:
             readme_content = f.read()
+        print("README文件读取成功")
     except Exception as e:
         print(f"读取README文件失败: {e}")
         # 如果无法读取现有文件，则创建一个新的README
+        print("将创建一个新的README文件")
         readme_content = "# GitHub Star Manager\n\n自动化管理和分类您的GitHub Star项目，通过AI生成摘要和分类，帮助您更好地管理和利用已收藏的项目。\n\n## 功能特点\n\n- 自动获取您的GitHub Star项目列表\n- 使用AI对项目进行智能分类\n- 生成项目摘要和关键特性\n- 定期更新README文件，保持项目列表最新\n- 完全基于GitHub Actions自动化运行\n\n## Star项目列表\n\n*此部分将由自动化脚本更新*\n\n## 许可证\n\nMIT"
     
+    print("开始生成Star项目列表内容...")
     # 生成Star项目列表内容
     star_list_content = f"*最后更新时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*\n\n用户: [{username}](https://github.com/{username})\n\n"
     
     # 添加分类项目列表
+    print("正在按分类添加项目列表...")
     for category, repos_in_category in sorted(categories.items()):
+        print(f"处理分类 '{category}'，包含{len(repos_in_category)}个项目")
         star_list_content += f"### {category}\n\n"
         
         # 按Star数量排序
+        print(f"  正在对'{category}'分类中的项目按Star数量排序")
         repos_in_category.sort(key=lambda x: x['stargazers_count'], reverse=True)
         
         for repo in repos_in_category:
@@ -77,25 +87,33 @@ def generate_readme_content(repos, username):
                 star_list_content += f"- {feature}\n"
             star_list_content += "\n"
     
+    print("Star项目列表内容生成完成，正在更新README文件...")
     # 在README中查找并替换"*此部分将由自动化脚本更新*"标记
     if "*此部分将由自动化脚本更新*" in readme_content:
+        print("找到更新标记，替换内容")
         content = readme_content.replace("*此部分将由自动化脚本更新*", star_list_content)
     else:
         # 如果找不到标记，则查找"## Star项目列表"部分
+        print("未找到更新标记，尝试查找Star项目列表部分")
         star_section_index = readme_content.find("## Star项目列表")
         if star_section_index != -1:
+            print("找到Star项目列表部分")
             # 查找下一个标题的位置
             next_section_index = readme_content.find("##", star_section_index + 1)
             if next_section_index != -1:
                 # 替换Star项目列表部分
+                print("找到下一个标题，替换Star项目列表部分")
                 content = readme_content[:star_section_index] + "## Star项目列表\n\n" + star_list_content + "\n" + readme_content[next_section_index:]
             else:
                 # 如果没有下一个标题，则添加到文件末尾
+                print("未找到下一个标题，将内容添加到Star项目列表部分")
                 content = readme_content[:star_section_index] + "## Star项目列表\n\n" + star_list_content
         else:
             # 如果找不到Star项目列表部分，则添加到文件末尾
+            print("未找到Star项目列表部分，将内容添加到文件末尾")
             content = readme_content + "\n\n## Star项目列表\n\n" + star_list_content
     
+    print("README内容生成完成")
     return content
 
 
@@ -103,17 +121,22 @@ def update_readme(content, readme_file):
     """
     更新README文件
     """
+    print(f"正在将更新后的内容写入README文件: {readme_file}")
     with open(readme_file, 'w', encoding='utf-8') as f:
         f.write(content)
-    print(f"已更新README文件: {readme_file}")
+    print(f"README文件更新成功: {readme_file}")
 
 
 def main():
+    print("========== 开始执行更新README脚本 ==========")
     # 加载配置
+    print("正在加载配置...")
     config = load_config()
     username = config.get('GITHUB_USERNAME')
+    print("配置加载完成")
     
     # 加载分类后的项目列表
+    print("正在加载分类后的项目数据...")
     data_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data')
     input_file = os.path.join(data_dir, 'classified_repos_latest.json')
     
@@ -122,14 +145,18 @@ def main():
         sys.exit(1)
     
     repos = load_classified_repos(input_file)
-    print(f"已加载{len(repos)}个分类后的项目")
+    print(f"成功加载{len(repos)}个分类后的项目")
     
     # 生成README内容
+    print("正在生成README内容...")
     content = generate_readme_content(repos, username)
     
     # 更新README文件
+    print("正在更新README文件...")
     readme_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'README.md')
     update_readme(content, readme_file)
+    
+    print("========== 更新README脚本执行完成 ==========")
 
 
 if __name__ == "__main__":

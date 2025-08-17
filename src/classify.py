@@ -254,29 +254,41 @@ def save_classified_repos(repos, output_file):
     """
     保存分类后的项目列表到文件
     """
+    print(f"正在保存{len(repos)}个分类后的项目到文件: {output_file}")
     with open(output_file, 'w', encoding='utf-8') as f:
         json.dump(repos, f, ensure_ascii=False, indent=2)
-    print(f"已保存{len(repos)}个分类后的项目到{output_file}")
+    print(f"文件保存成功: {output_file}")
 
 
 def main():
+    print("========== 开始执行项目分类和摘要生成脚本 ==========")
     # 获取AI API密钥
+    print("正在获取AI API密钥...")
     ai_api_key = os.environ.get('AI_API_KEY')
     if not ai_api_key:
         print("错误: 未设置AI_API_KEY环境变量")
         sys.exit(1)
+    print("成功获取AI API密钥")
     
     # 加载配置
+    print("正在加载配置文件...")
     config = load_config()
     ai_model = config.get('ai_model', 'glm-4.5-flash')
     ai_api_url = config.get('ai_api_url', 'https://open.bigmodel.cn/api/paas/v4/chat/completions')
     categories = config.get('categories', ['其他'])
+    incremental_update = config.get('incremental_update', True)
+    print(f"配置加载完成，使用模型: {ai_model}")
+    print(f"可用分类: {', '.join(categories)}")
+    print(f"增量更新模式: {incremental_update}")
     
     # 创建输出目录
+    print("正在创建输出目录...")
     data_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data')
     os.makedirs(data_dir, exist_ok=True)
+    print(f"输出目录已准备: {data_dir}")
     
     # 加载最新的项目列表
+    print("正在加载最新的项目列表...")
     input_file = os.path.join(data_dir, 'starred_repos_latest.json')
     if not os.path.exists(input_file):
         print(f"错误: 找不到项目列表文件 {input_file}")
@@ -285,12 +297,56 @@ def main():
     repos = load_repos(input_file)
     print(f"已加载{len(repos)}个Star项目")
     
-    # 对项目进行分类和摘要生成
-    # 设置较长的请求间隔和最大并发数为2，避免API并发限制
-    classified_repos = classify_repos(repos, ai_api_key, ai_api_url, ai_model, categories, 
-                                    request_interval=5, max_concurrent=2)
+    # 如果是增量更新，加载现有的分类结果
+    if incremental_update:
+        existing_classified_repos = []
+        existing_repo_urls = set()
+        latest_classified_file = os.path.join(data_dir, 'classified_repos_latest.json')
+        
+        if os.path.exists(latest_classified_file):
+            try:
+                print(f"增量更新模式：正在加载现有分类结果 {latest_classified_file}")
+                with open(latest_classified_file, 'r', encoding='utf-8') as f:
+                    existing_classified_repos = json.load(f)
+                existing_repo_urls = {repo['html_url'] for repo in existing_classified_repos}
+                print(f"已加载{len(existing_classified_repos)}个现有分类项目")
+                
+                # 筛选出需要分类的新项目
+                new_repos = [repo for repo in repos if repo['html_url'] not in existing_repo_urls]
+                print(f"发现{len(new_repos)}个新项目需要分类")
+                
+                if not new_repos:
+                    print("没有新项目需要分类，使用现有分类结果")
+                    classified_repos = existing_classified_repos
+                else:
+                    # 只对新项目进行分类
+                    print(f"开始对{len(new_repos)}个新项目进行分类和摘要生成...")
+                    print(f"设置请求间隔为5秒，最大并发数为2，以避免API并发限制")
+                    new_classified_repos = classify_repos(new_repos, ai_api_key, ai_api_url, ai_model, categories, 
+                                                        request_interval=5, max_concurrent=2)
+                    print(f"新项目分类和摘要生成完成，共处理{len(new_classified_repos)}个项目")
+                    
+                    # 合并新旧分类结果
+                    classified_repos = existing_classified_repos + new_classified_repos
+                    print(f"合并分类结果：{len(existing_classified_repos)}个现有项目 + {len(new_classified_repos)}个新项目 = {len(classified_repos)}个总项目")
+            except Exception as e:
+                print(f"加载现有分类结果失败，将对所有项目重新分类: {e}")
+                incremental_update = False
+        else:
+            print("未找到现有分类结果，将对所有项目进行分类")
+            incremental_update = False
+    
+    # 如果不是增量更新或增量更新失败，对所有项目进行分类
+    if not incremental_update or 'classified_repos' not in locals():
+        print("开始对项目进行分类和摘要生成...")
+        print(f"设置请求间隔为5秒，最大并发数为2，以避免API并发限制")
+        # 设置较长的请求间隔和最大并发数为2，避免API并发限制
+        classified_repos = classify_repos(repos, ai_api_key, ai_api_url, ai_model, categories, 
+                                        request_interval=5, max_concurrent=2)
+        print(f"项目分类和摘要生成完成，共处理{len(classified_repos)}个项目")
     
     # 保存结果
+    print("正在保存分类结果...")
     timestamp = datetime.now().strftime('%Y%m%d')
     output_file = os.path.join(data_dir, f'classified_repos_{timestamp}.json')
     save_classified_repos(classified_repos, output_file)
@@ -298,6 +354,8 @@ def main():
     # 同时保存一个最新版本
     latest_file = os.path.join(data_dir, 'classified_repos_latest.json')
     save_classified_repos(classified_repos, latest_file)
+    
+    print("========== 项目分类和摘要生成脚本执行完成 ==========")
 
 
 if __name__ == "__main__":

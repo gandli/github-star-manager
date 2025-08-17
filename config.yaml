@@ -2,7 +2,8 @@
 
 # 基本配置
 update_interval: 7    # 更新频率（天）
-max_stars: 9999        # 测试阶段设置为10个项目，成功后可以增加到更大的值
+max_stars: 9999        # 最大获取的Star项目数量
+incremental_update: true  # 是否使用增量更新模式（只获取最新的Star项目）
 
 # AI配置
 ai_model: "glm-4.5-flash"  # 使用的AI模型

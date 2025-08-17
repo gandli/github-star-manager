@@ -5,6 +5,7 @@
 ## 功能特点
 
 - 自动获取您的GitHub Star项目列表
+- 支持增量更新模式，只获取最新的Star项目
 - 使用AI对项目进行智能分类
 - 生成项目摘要和关键特性
 - 定期更新README文件，保持项目列表最新
@@ -12,7 +13,7 @@
 
 ## 工作原理
 
-1. 通过GitHub API获取用户的Star项目列表
+1. 通过GitHub API获取用户的Star项目列表（默认使用增量更新模式，只获取最新的Star项目）
 2. 使用AI模型（默认为智谱AI的GLM-4.5-Flash）对项目进行分类和摘要生成
 3. 将分类结果更新到README.md文件中
 4. 通过GitHub Actions定期自动运行，保持项目列表最新
@@ -44,7 +45,21 @@
    pip install -r requirements.txt
    ```
 
-3. 设置环境变量
+3. 设置环境变量（两种方式）
+
+   **方式一：使用.env文件（推荐）**
+   
+   复制`.env.example`文件为`.env`并填入您的信息：
+   ```
+   # 必需的环境变量
+   GH_PAT=your_github_token
+   AI_API_KEY=your_ai_api_key
+   
+   # 可选的环境变量
+   GITHUB_USERNAME=your_github_username  # 覆盖config.yaml中的设置
+   ```
+   
+   **方式二：直接设置系统环境变量**
    ```bash
    # Linux/macOS
    export GH_PAT=your_github_token
@@ -72,6 +87,7 @@
 │   ├── fetch_stars.py  # 获取Star项目列表
 │   ├── classify.py     # 项目分类和摘要生成
 │   └── update_readme.py # 更新README文件
+├── .env.example        # 环境变量示例文件
 ├── config.yaml         # 配置文件
 ├── requirements.txt    # 项目依赖
 ├── run_local.py        # 本地运行脚本
@@ -86,6 +102,7 @@
 - `update_interval`: 更新频率（天）
 - `categories`: 自定义分类类别
 - `max_stars`: 最大获取的Star项目数量（默认为5000）。如果您的Star项目数量超过此值，请增加此配置以获取所有项目。例如，对于有4000多个Star项目的用户，建议设置为5000或更高
+- `incremental_update`: 是否启用增量更新模式（默认为true）。启用后，每次更新只获取最新的Star项目，而不是全量更新
 - `ai_model`: 使用的AI模型
 - `ai_api_url`: AI API地址
 

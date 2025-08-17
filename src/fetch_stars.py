@@ -25,7 +25,7 @@ def load_config():
         sys.exit(1)
 
 
-def fetch_starred_repos(username, token, max_stars=100):
+def fetch_starred_repos(username, token, max_stars=100, incremental=True):
     """
     获取用户的Star项目列表
     
@@ -33,6 +33,7 @@ def fetch_starred_repos(username, token, max_stars=100):
         username: GitHub用户名
         token: GitHub访问令牌
         max_stars: 最大获取数量
+        incremental: 是否增量更新（只获取最新的Star项目）
         
     Returns:
         list: 项目列表
@@ -47,7 +48,27 @@ def fetch_starred_repos(username, token, max_stars=100):
         'X-GitHub-Api-Version': '2022-11-28'
     }
     
+    print(f"开始获取GitHub Star项目列表...")
+    
+    # 如果是增量更新，先加载现有的项目列表
+    existing_repos = []
+    existing_repo_urls = set()
+    if incremental:
+        try:
+            data_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data')
+            latest_file = os.path.join(data_dir, 'starred_repos_latest.json')
+            if os.path.exists(latest_file):
+                print(f"增量更新模式：正在加载现有项目列表 {latest_file}")
+                with open(latest_file, 'r', encoding='utf-8') as f:
+                    existing_repos = json.load(f)
+                existing_repo_urls = {repo['html_url'] for repo in existing_repos}
+                print(f"已加载{len(existing_repos)}个现有项目")
+        except Exception as e:
+            print(f"加载现有项目列表失败，将执行全量更新: {e}")
+            incremental = False
+    
     while len(all_repos) < max_stars:
+        print(f"正在获取第{page}页数据 (每页{per_page}条)...")
         url = f"https://api.github.com/users/{username}/starred?page={page}&per_page={per_page}"
         response = requests.get(url, headers=headers)
         
@@ -57,19 +78,43 @@ def fetch_starred_repos(username, token, max_stars=100):
             
         repos = response.json()
         if not repos:  # 没有更多项目
+            print(f"没有更多项目，获取完成")
             break
             
-        all_repos.extend(repos)
+        print(f"成功获取第{page}页数据，共{len(repos)}个项目")
+        
+        # 如果是增量更新，检查是否已经获取到所有新项目
+        if incremental:
+            new_repos = []
+            for repo in repos:
+                if repo['html_url'] not in existing_repo_urls:
+                    new_repos.append(repo)
+                else:
+                    print(f"已找到现有项目，增量更新完成")
+                    break
+            
+            if len(new_repos) < len(repos):  # 说明找到了已存在的项目
+                all_repos.extend(new_repos)
+                break
+            
+            all_repos.extend(new_repos)
+        else:
+            all_repos.extend(repos)
+        
         page += 1
         
         # 达到最大数量后停止
         if len(all_repos) >= max_stars:
+            print(f"已达到最大获取数量({max_stars})，停止获取")
             all_repos = all_repos[:max_stars]
             break
     
     # 提取需要的信息
+    print(f"开始处理获取到的{len(all_repos)}个项目数据...")
     result = []
-    for repo in all_repos:
+    for i, repo in enumerate(all_repos, 1):
+        if i % 20 == 0:  # 每处理20个项目打印一次进度
+            print(f"正在处理项目数据: {i}/{len(all_repos)}")
         result.append({
             'name': repo['name'],
             'full_name': repo['full_name'],
@@ -84,29 +129,36 @@ def fetch_starred_repos(username, token, max_stars=100):
             'starred_at': None  # GitHub API不直接提供此信息
         })
     
+    print(f"项目数据处理完成，共{len(result)}个项目")
     return result
 
 
 def save_repos_to_file(repos, output_file):
-    """
-    保存项目列表到文件
-    """
+    """将仓库信息保存到JSON文件"""
+    print(f"正在保存{len(repos)}个项目到文件: {output_file}")
     with open(output_file, 'w', encoding='utf-8') as f:
         json.dump(repos, f, ensure_ascii=False, indent=2)
+    print(f"文件保存成功: {output_file}")
     print(f"已保存{len(repos)}个Star项目到{output_file}")
 
 
 def main():
+    print("========== 开始执行获取GitHub Star项目列表脚本 ==========")
     # 获取GitHub Token
     github_token = os.environ.get('GH_PAT')
     if not github_token:
         print("错误: 未设置GH_PAT环境变量")
         sys.exit(1)
     
+    print("正在加载配置文件...")
     # 加载配置
     config = load_config()
     max_stars = config.get('max_stars', 100)
+    # 默认使用增量更新模式
+    incremental_update = config.get('incremental_update', True)
+    print(f"配置加载完成，最大获取Star数量: {max_stars}，增量更新模式: {incremental_update}")
     
+    print("正在获取GitHub用户名...")
     # 首先检查是否设置了GITHUB_USERNAME环境变量（优先级最高）
     # 在GitHub Actions工作流中，这个变量通常设置为github.repository_owner
     username = os.environ.get('GITHUB_USERNAME')
@@ -125,23 +177,58 @@ def main():
         else:
             # 如果无法从GITHUB_REPOSITORY获取，则使用配置文件中的用户名
             username = config.get('username')
+            print(f"使用配置文件中的用户名: {username}")
     else:
         # 本地运行时使用配置文件中的用户名
         username = config.get('username')
+        print(f"使用配置文件中的用户名: {username}")
     
     if not username:
         print("错误: 无法获取GitHub用户名，请在config.yaml中设置username或确保在GitHub Actions环境中运行")
         sys.exit(1)
     
     # 创建输出目录
+    print("正在创建输出目录...")
     data_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data')
     os.makedirs(data_dir, exist_ok=True)
+    print(f"输出目录已准备: {data_dir}")
     
     # 获取Star项目
     print(f"正在获取用户 {username} 的Star项目...")
-    repos = fetch_starred_repos(username, github_token, max_stars)
+    if incremental_update:
+        print("使用增量更新模式，只获取最新的Star项目")
+    else:
+        print("使用全量更新模式，获取所有Star项目")
+    
+    repos = fetch_starred_repos(username, github_token, max_stars, incremental_update)
+    
+    # 如果是增量更新且有新项目，则合并新旧项目列表
+    if incremental_update and repos:
+        latest_file = os.path.join(data_dir, 'starred_repos_latest.json')
+        if os.path.exists(latest_file):
+            try:
+                with open(latest_file, 'r', encoding='utf-8') as f:
+                    existing_repos = json.load(f)
+                
+                # 合并新旧项目列表，确保没有重复
+                existing_urls = {repo['html_url'] for repo in existing_repos}
+                merged_repos = existing_repos.copy()
+                
+                new_count = 0
+                for repo in repos:
+                    if repo['html_url'] not in existing_urls:
+                        merged_repos.append(repo)
+                        new_count += 1
+                
+                print(f"合并项目列表：{len(existing_repos)}个现有项目 + {new_count}个新项目 = {len(merged_repos)}个总项目")
+                repos = merged_repos
+            except Exception as e:
+                print(f"合并项目列表失败: {e}，将只使用新获取的项目")
+    
+    print(f"成功获取 {len(repos)} 个Star项目")
     
     # 保存结果
+    print("正在保存项目数据...")
     timestamp = datetime.now().strftime('%Y%m%d')
     output_file = os.path.join(data_dir, f'starred_repos_{timestamp}.json')
     save_repos_to_file(repos, output_file)
@@ -149,6 +236,8 @@ def main():
     # 同时保存一个最新版本
     latest_file = os.path.join(data_dir, 'starred_repos_latest.json')
     save_repos_to_file(repos, latest_file)
+    
+    print("========== 获取GitHub Star项目列表脚本执行完成 ==========")
 
 
 if __name__ == "__main__":

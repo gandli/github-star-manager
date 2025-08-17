@@ -37,13 +37,19 @@ jobs:
         run: mkdir -p data
 
       - name: 获取Star项目列表
-        run: python src/fetch_stars.py
+        run: |
+          echo "开始获取Star项目列表（增量更新模式）..."
+          python src/fetch_stars.py
+          echo "Star项目列表获取完成"
         env:
           GH_PAT: ${{ secrets.GH_PAT }}
           GITHUB_USERNAME: ${{ github.repository_owner }}
 
       - name: 项目分类和摘要生成
-        run: python src/classify.py
+        run: |
+          echo "开始项目分类和摘要生成（增量更新模式）..."
+          python src/classify.py
+          echo "项目分类和摘要生成完成"
         env:
           AI_API_KEY: ${{ secrets.AI_API_KEY }}
 
