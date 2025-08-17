@@ -3,8 +3,10 @@ import requests
 import json
 import logging
 import traceback
+import time
 from typing import Dict, List, Any, Optional
 from logging_config import setup_logging
+from config import config
 
 # 配置日志
 logger = setup_logging()
@@ -17,9 +19,13 @@ class AIProcessor:
         """初始化AI处理器
 
         Args:
-            api_key: GitHub API密钥，如果为None则从环境变量获取
+            api_key: GitHub API密钥，如果为None则从配置获取
         """
-        self.api_key = os.getenv("GH_TOKEN")
+        self.api_key = api_key or config["ai"]["token"]
+        self.cache = {}
+        self.cache_hits = 0
+        self.cache_misses = 0
+        
         if not self.api_key:
             logger.warning("未设置GitHub AI API密钥，将使用启发式方法进行分类")
 
@@ -32,18 +38,48 @@ class AIProcessor:
         Returns:
             分类结果
         """
+        # 检查缓存
+        repo_id = repo_data.get("id") or repo_data.get("full_name")
+        cache_key = f"classify_{repo_id}"
+        
+        if cache_key in self.cache:
+            self.cache_hits += 1
+            logger.debug(f"缓存命中: {cache_key}")
+            return self.cache[cache_key]
+            
+        self.cache_misses += 1
+        
         if not self.api_key:
-            return self._heuristic_classify(repo_data)
+            result = self._heuristic_classify(repo_data)
+            self.cache[cache_key] = result
+            return result
 
         try:
             # 准备请求数据
             prompt = self._generate_classification_prompt(repo_data)
             classification = self._call_github_ai(prompt)
-            return classification.strip()
+            result = classification.strip()
+            
+            # 验证分类结果是否在预定义分类中
+            if result not in config["categories"]:
+                # 尝试查找最接近的分类
+                for category in config["categories"]:
+                    if result.lower() in category.lower() or category.lower() in result.lower():
+                        result = category
+                        break
+                else:
+                    # 如果仍然找不到匹配，使用启发式方法
+                    result = self._heuristic_classify(repo_data)
+            
+            # 保存到缓存
+            self.cache[cache_key] = result
+            return result
         except Exception as e:
             logger.error(f"AI分类失败: {str(e)}")
             # 失败时回退到启发式方法
-            return self._heuristic_classify(repo_data)
+            result = self._heuristic_classify(repo_data)
+            self.cache[cache_key] = result
+            return result
 
     def generate_summary(self, repo_data: Dict[str, Any]) -> str:
         """生成仓库摘要
@@ -54,21 +90,44 @@ class AIProcessor:
         Returns:
             生成的摘要
         """
+        # 检查缓存
+        repo_id = repo_data.get("id") or repo_data.get("full_name")
+        cache_key = f"summary_{repo_id}"
+        
+        if cache_key in self.cache:
+            self.cache_hits += 1
+            logger.debug(f"缓存命中: {cache_key}")
+            return self.cache[cache_key]
+            
+        self.cache_misses += 1
+        
         if not self.api_key:
-            return self._generate_basic_summary(repo_data)
+            result = self._generate_basic_summary(repo_data)
+            self.cache[cache_key] = result
+            return result
 
         try:
             # 准备请求数据
             prompt = self._generate_summary_prompt(repo_data)
             summary = self._call_github_ai(prompt)
-            return summary.strip()
+            result = summary.strip()
+            
+            # 验证摘要长度，如果太短则使用基础摘要
+            if len(result) < 10:
+                result = self._generate_basic_summary(repo_data)
+                
+            # 保存到缓存
+            self.cache[cache_key] = result
+            return result
         except Exception as e:
             logger.error(f"AI摘要生成失败: {str(e)}")
             # 失败时回退到基础摘要
-            return self._generate_basic_summary(repo_data)
+            result = self._generate_basic_summary(repo_data)
+            self.cache[cache_key] = result
+            return result
 
     def _call_github_ai(self, prompt: str) -> str:
-        """调用GitHub AI API
+        """调用GitHub AI API，包含重试机制
 
         Args:
             prompt: 提示词
@@ -80,49 +139,84 @@ class AIProcessor:
             logger.warning("未设置API密钥，无法调用AI服务")
             return ""
 
-        try:
-            logger.debug(f"准备调用AI API，提示词长度: {len(prompt)}")
+        max_retries = config["ai"].get("max_retries", 3)
+        retry_delay = config["ai"].get("retry_delay", 5)
+        timeout = config["ai"].get("timeout", 30)
+        
+        for attempt in range(max_retries):
+            try:
+                logger.debug(f"准备调用AI API，提示词长度: {len(prompt)}，尝试次数: {attempt + 1}/{max_retries}")
 
-            headers = {
-                "Authorization": f"Bearer {self.api_key}",
-                "Content-Type": "application/json",
-                "Accept": "application/json",
-            }
+                headers = {
+                    "Authorization": f"Bearer {self.api_key}",
+                    "Content-Type": "application/json",
+                    "Accept": "application/json",
+                }
 
-            data = {
-                "model": "github-copilot",  # 使用GitHub Copilot模型
-                "prompt": prompt,
-                "max_tokens": 300,
-                "temperature": 0.5,
-            }
+                data = {
+                    "model": config["ai"]["model"],
+                    "prompt": prompt,
+                    "max_tokens": config["ai"]["max_tokens"],
+                    "temperature": config["ai"]["temperature"],
+                }
 
-            logger.debug("发送API请求")
-            response = requests.post(
-                "https://api.github.com/copilot/completions",
-                headers=headers,
-                json=data,
-                timeout=30,  # 设置超时时间
-            )
+                logger.debug("发送API请求")
+                response = requests.post(
+                    config["ai"]["api_url"],
+                    headers=headers,
+                    json=data,
+                    timeout=timeout,
+                )
 
-            if response.status_code != 200:
-                logger.error(f"API调用失败: {response.status_code} - {response.text}")
-                raise Exception(f"API调用失败: {response.status_code}")
+                # 处理速率限制
+                if response.status_code == 429:
+                    retry_after = int(response.headers.get("Retry-After", retry_delay))
+                    logger.warning(f"API速率限制，等待 {retry_after} 秒后重试")
+                    time.sleep(retry_after)
+                    continue
+                    
+                # 处理其他错误
+                if response.status_code != 200:
+                    error_msg = f"API调用失败: {response.status_code} - {response.text}"
+                    logger.error(error_msg)
+                    
+                    if attempt < max_retries - 1:
+                        logger.info(f"将在 {retry_delay} 秒后重试，剩余尝试次数: {max_retries - attempt - 1}")
+                        time.sleep(retry_delay)
+                        continue
+                    else:
+                        raise Exception(error_msg)
 
-            result = response.json()
-            response_text = result.get("choices", [{}])[0].get("text", "")
-            logger.debug(f"API调用成功，响应长度: {len(response_text)}")
-            return response_text
-        except requests.exceptions.Timeout:
-            logger.error("API调用超时")
-            raise Exception("API调用超时")
-        except requests.exceptions.RequestException as e:
-            logger.error(f"API请求异常: {str(e)}")
-            logger.error(traceback.format_exc())
-            raise Exception(f"API请求异常: {str(e)}")
-        except Exception as e:
-            logger.error(f"调用AI API时发生未知错误: {str(e)}")
-            logger.error(traceback.format_exc())
-            raise
+                result = response.json()
+                response_text = result.get("choices", [{}])[0].get("text", "")
+                logger.debug(f"API调用成功，响应长度: {len(response_text)}")
+                return response_text
+                
+            except requests.exceptions.Timeout:
+                logger.error(f"API调用超时，尝试次数: {attempt + 1}/{max_retries}")
+                if attempt < max_retries - 1:
+                    logger.info(f"将在 {retry_delay} 秒后重试")
+                    time.sleep(retry_delay)
+                else:
+                    raise Exception("API调用超时，已达到最大重试次数")
+                    
+            except requests.exceptions.RequestException as e:
+                logger.error(f"API请求异常: {str(e)}，尝试次数: {attempt + 1}/{max_retries}")
+                if attempt < max_retries - 1:
+                    logger.info(f"将在 {retry_delay} 秒后重试")
+                    time.sleep(retry_delay)
+                else:
+                    logger.error(traceback.format_exc())
+                    raise Exception(f"API请求异常: {str(e)}")
+                    
+            except Exception as e:
+                logger.error(f"调用AI API时发生未知错误: {str(e)}，尝试次数: {attempt + 1}/{max_retries}")
+                if attempt < max_retries - 1:
+                    logger.info(f"将在 {retry_delay} 秒后重试")
+                    time.sleep(retry_delay)
+                else:
+                    logger.error(traceback.format_exc())
+                    raise
 
     def _generate_classification_prompt(self, repo_data: Dict[str, Any]) -> str:
         """生成分类提示词
@@ -195,6 +289,8 @@ class AIProcessor:
 
     def _heuristic_classify(self, repo_data: Dict[str, Any]) -> str:
         """使用启发式方法进行分类
+        
+        基于仓库的描述、语言和主题标签，使用关键词匹配进行分类
 
         Args:
             repo_data: 仓库数据
@@ -405,8 +501,45 @@ class AIProcessor:
         ):
             return "物联网"
 
+        # 检查是否有README或文档相关的关键词
+        if any(
+            keyword in all_text
+            for keyword in [
+                "awesome",
+                "list",
+                "resource",
+                "collection",
+                "tutorial",
+                "guide",
+                "book",
+                "course",
+                "learn",
+                "cheatsheet",
+                "documentation",
+            ]
+        ):
+            return "学习资源"
+            
         # 默认分类
         return "其他"
+        
+    def get_cache_stats(self) -> Dict[str, int]:
+        """获取缓存统计信息
+        
+        Returns:
+            包含缓存命中和未命中次数的字典
+        """
+        return {
+            "hits": self.cache_hits,
+            "misses": self.cache_misses,
+            "total": self.cache_hits + self.cache_misses,
+            "hit_rate": self.cache_hits / (self.cache_hits + self.cache_misses) if (self.cache_hits + self.cache_misses) > 0 else 0
+        }
+        
+    def clear_cache(self) -> None:
+        """清除缓存"""
+        self.cache.clear()
+        logger.info("缓存已清除")
 
     def _generate_basic_summary(self, repo_data: Dict[str, Any]) -> str:
         """生成基础摘要
@@ -422,9 +555,17 @@ class AIProcessor:
         language = repo_data.get("language", "未知")
         stars = repo_data.get("stargazers_count", 0)
         updated_at = repo_data.get("updated_at", "")
+        topics = repo_data.get("topics", [])
 
         # 格式化更新时间
         if updated_at and hasattr(updated_at, "strftime"):
             updated_at = updated_at.strftime("%Y-%m-%d")
 
+        # 如果描述为空，尝试使用其他信息构建摘要
+        if description == "无描述" or not description:
+            if topics:
+                return f"一个{language}项目，主题包括: {', '.join(topics[:3])}"
+            else:
+                return f"一个{language}项目，已获得{stars}个星标"
+        
         return f"{description}"

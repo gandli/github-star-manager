@@ -26,7 +26,7 @@
      - **必须**具有`repo`和`read:user`权限
      - 创建方法：GitHub个人设置 -> Developer settings -> Personal access tokens -> Generate new token
      - 注意：默认的`GITHUB_TOKEN`没有访问用户star项目的权限，必须使用PAT
-   - `GITHUB_AI_TOKEN`: (可选) GitHub AI API密钥，用于AI分类和摘要生成
+   - `GH_TOKEN`: (可选) GitHub AI API密钥，用于AI分类和摘要生成
 
 #### 2. 自定义配置
 
@@ -59,8 +59,8 @@
    - 解决方法：使用具有`repo`和`read:user`权限的个人访问令牌(PAT)，并在仓库设置中添加为`GH_PAT`密钥
 
 2. **AI分类或摘要生成失败**
-   - 原因：未设置GITHUB_AI_TOKEN或API调用失败
-   - 解决方法：确保设置了有效的GITHUB_AI_TOKEN，或等待AI服务可用
+   - 原因：未设置GH_TOKEN或API调用失败
+   - 解决方法：确保设置了有效的GH_TOKEN，或等待AI服务可用
 
 3. **GitHub Actions工作流失败**
    - 检查Actions日志以获取详细错误信息

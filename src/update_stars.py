@@ -24,31 +24,145 @@ def init_github_client():
 # 获取用户star的项目
 def get_starred_repos(g):
     try:
+        from config import config
+        import time
         user = g.get_user()
-        starred = user.get_starred()
-        logger.info(f"成功获取star项目列表")
-        return starred
+        
+        # 获取配置参数
+        per_page = config["github"]["per_page"]
+        max_retries = config["github"]["max_retries"]
+        retry_delay = config["github"]["retry_delay"]
+        
+        # 使用分页参数获取star项目
+        try:
+            # 尝试获取带有starred_at时间戳的数据
+            # 需要设置特殊的Accept头，但PyGithub不直接支持，所以这里使用原始API
+            starred = user.get_starred(sort="created", direction="desc")
+            logger.info(f"成功获取star项目列表，使用标准API")
+        except Exception as e:
+            logger.warning(f"使用标准API获取star项目失败，回退到基本方法: {str(e)}")
+            starred = user.get_starred()
+        
+        # 记录总数
+        try:
+            total_count = starred.totalCount
+            logger.info(f"共找到 {total_count} 个star项目")
+        except Exception as e:
+            logger.warning(f"无法获取star项目总数: {str(e)}")
+            total_count = "未知"
+        
+        # 分页获取所有项目
+        repos = []
+        retry_count = 0
+        page = 0
+        
+        # 如果配置了只获取部分项目
+        max_repos = config["github"].get("max_repos", 0)
+        if max_repos > 0:
+            logger.info(f"将只获取最新的 {max_repos} 个star项目")
+        
+        while True:
+            try:
+                # 获取当前页的项目
+                page_items = starred.get_page(page)
+                page_repos = list(page_items)
+                
+                if not page_repos:
+                    # 没有更多项目，退出循环
+                    break
+                
+                # 添加到结果列表
+                repos.extend(page_repos)
+                logger.info(f"已获取第 {page+1} 页，{len(repos)}/{total_count} 个项目")
+                
+                # 如果达到最大获取数量，退出循环
+                if max_repos > 0 and len(repos) >= max_repos:
+                    logger.info(f"已达到最大获取数量 {max_repos}，停止获取")
+                    repos = repos[:max_repos]  # 确保不超过最大数量
+                    break
+                
+                # 继续下一页
+                page += 1
+                retry_count = 0  # 重置重试计数
+                
+            except Exception as e:
+                retry_count += 1
+                if retry_count > max_retries:
+                    logger.error(f"获取第 {page+1} 页star项目失败，已达到最大重试次数: {str(e)}")
+                    break
+                
+                logger.warning(f"获取第 {page+1} 页star项目失败，第 {retry_count} 次重试: {str(e)}")
+                time.sleep(retry_delay)  # 等待一段时间后重试
+        
+        logger.info(f"获取到 {len(repos)} 个star项目")
+        return repos
     except Exception as e:
         logger.error(f"获取star项目失败: {str(e)}")
         raise
 
 # 将PyGithub对象转换为字典
 def repo_to_dict(repo) -> Dict[str, Any]:
-    """将PyGithub仓库对象转换为字典"""
-    return {
-        "name": repo.name,
-        "full_name": repo.full_name,
-        "description": repo.description,
-        "language": repo.language,
-        "stargazers_count": repo.stargazers_count,
-        "forks_count": repo.forks_count,
-        "updated_at": repo.updated_at,
-        "html_url": repo.html_url,
-        "topics": repo.get_topics() if hasattr(repo, 'get_topics') else []
-    }
+    """将PyGithub仓库对象转换为字典
+    
+    Args:
+        repo: PyGithub仓库对象
+        
+    Returns:
+        包含仓库信息的字典
+    """
+    try:
+        # 基本信息
+        repo_dict = {
+            "name": repo.name,
+            "full_name": repo.full_name,
+            "description": repo.description or "",
+            "language": repo.language or "未知",
+            "stargazers_count": repo.stargazers_count,
+            "forks_count": repo.forks_count,
+            "updated_at": repo.updated_at,
+            "html_url": repo.html_url,
+            "created_at": repo.created_at,
+            "pushed_at": repo.pushed_at,
+            "size": repo.size,
+            "default_branch": repo.default_branch,
+            "open_issues_count": repo.open_issues_count,
+            "is_fork": repo.fork
+        }
+        
+        # 获取主题标签
+        try:
+            repo_dict["topics"] = repo.get_topics() if hasattr(repo, 'get_topics') else []
+        except Exception as e:
+            logger.warning(f"获取仓库 {repo.name} 的主题标签失败: {str(e)}")
+            repo_dict["topics"] = []
+        
+        # 尝试获取starred_at时间戳（如果可用）
+        try:
+            if hasattr(repo, 'starred_at'):
+                repo_dict["starred_at"] = repo.starred_at
+            # 如果使用特殊API获取starred_at
+            elif hasattr(repo, '_starred_at'):
+                repo_dict["starred_at"] = repo._starred_at
+        except Exception as e:
+            logger.warning(f"获取仓库 {repo.name} 的starred_at时间戳失败: {str(e)}")
+            # 如果无法获取，使用updated_at作为回退
+            repo_dict["starred_at"] = repo_dict["updated_at"]
+        
+        return repo_dict
+    except Exception as e:
+        logger.error(f"转换仓库 {repo.name if hasattr(repo, 'name') else 'unknown'} 为字典时出错: {str(e)}")
+        # 返回基本信息，确保不会因为单个字段错误导致整个处理失败
+        return {
+            "name": repo.name if hasattr(repo, 'name') else "未知",
+            "full_name": repo.full_name if hasattr(repo, 'full_name') else "未知",
+            "html_url": repo.html_url if hasattr(repo, 'html_url') else "",
+            "description": "获取详细信息时出错"
+        }
 
 # 使用AI生成项目分类和摘要
 def generate_summary(repo, ai_processor):
+    """生成仓库摘要（已废弃，保留仅为向后兼容）"""
+    logger.warning("generate_summary函数已废弃，请直接使用update_readme函数")
     # 转换为字典
     repo_dict = repo_to_dict(repo)
     
@@ -70,6 +184,11 @@ def generate_summary(repo, ai_processor):
     if summary:
         base_info += f"- **摘要**: {summary}\n"
     
+    # 添加主题标签（如果有）
+    if hasattr(repo, 'topics') and repo.topics and len(repo.topics) > 0:
+        topics_str = ", ".join([f"`{topic}`" for topic in repo.topics])
+        base_info += f"- **标签**: {topics_str}\n"
+    
     return base_info
 
 # 按分类组织仓库
@@ -86,70 +205,225 @@ def organize_by_category(repos_data):
     return categories
 
 # 更新README.md
-def update_readme(repos, ai_processor):
+def update_readme(repos_data, ai_processor):
+    """更新README.md文件
+    
+    Args:
+        repos_data: 仓库数据列表
+        ai_processor: AI处理器实例
+    """
     logger.info("开始更新README.md")
     
-    # 收集所有仓库数据
-    repos_data = []
-    for repo in repos:
-        try:
-            repo_dict = repo_to_dict(repo)
-            repo_dict["category"] = ai_processor.classify_repository(repo_dict)
-            repo_dict["summary"] = ai_processor.generate_summary(repo_dict)
-            repo_dict["markdown"] = generate_summary(repo, ai_processor)
-            repos_data.append(repo_dict)
-        except Exception as e:
-            logger.error(f"处理仓库 {repo.name} 时出错: {str(e)}")
+    # 导入配置
+    from config import config
+    
+    # 为每个仓库生成markdown内容
+    for repo_data in repos_data:
+        if "markdown" not in repo_data:
+            try:
+                # 生成基础项目信息
+                base_info = f"""
+## [{repo_data['name']}]({repo_data['html_url']})
+- **描述**: {repo_data['description'] or '无描述'}
+- **语言**: {repo_data['language'] or '未知'}
+- **星数**: {repo_data['stargazers_count']}
+- **最后更新**: {repo_data['updated_at'].strftime('%Y-%m-%d') if hasattr(repo_data['updated_at'], 'strftime') else repo_data['updated_at']}
+- **分类**: {repo_data['category']}
+"""
+                
+                # 添加AI生成的摘要
+                if repo_data.get("summary"):
+                    base_info += f"- **摘要**: {repo_data['summary']}\n"
+                
+                # 添加主题标签（如果有）
+                if repo_data.get("topics") and len(repo_data["topics"]) > 0:
+                    topics_str = ", ".join([f"`{topic}`" for topic in repo_data["topics"]])
+                    base_info += f"- **标签**: {topics_str}\n"
+                
+                repo_data["markdown"] = base_info
+            except Exception as e:
+                logger.error(f"为仓库 {repo_data.get('name', '未知')} 生成markdown时出错: {str(e)}")
+                repo_data["markdown"] = f"\n## [{repo_data.get('name', '未知')}]({repo_data.get('html_url', '#')})\n- 生成详细信息时出错\n"
     
     # 按分类组织
     categories = organize_by_category(repos_data)
     
-    # 写入README
-    with open('README.md', 'w', encoding='utf-8') as f:
-        f.write("# 我的GitHub Star项目 [![Update Starred Repos](https://github.com/gandli/github-star-manager/actions/workflows/update_stars.yml/badge.svg)](https://github.com/gandli/github-star-manager/actions/workflows/update_stars.yml)\n\n")
-        f.write(f"最后更新: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
+    # 获取README模板文件路径
+    template_file = config["readme"]["template_file"]
+    output_file = config["readme"]["output_file"]
+    
+    # 检查是否存在模板文件
+    if os.path.exists(template_file):
+        try:
+            # 使用模板生成README
+            with open(template_file, 'r', encoding='utf-8') as f:
+                template_content = f.read()
+            
+            # 替换模板变量
+            content = template_content
+            content = content.replace("{{update_time}}", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+            
+            # 生成分类统计表格
+            categories_table = "| 分类 | 数量 |\n| --- | --- |\n"
+            for category, repos in sorted(categories.items()):
+                categories_table += f"| {category} | {len(repos)} |\n"
+            content = content.replace("{{categories_table}}", categories_table)
+            
+            # 生成分类目录
+            categories_toc = ""
+            for category in sorted(categories.keys()):
+                categories_toc += f"- [{category}](#user-content-{category.lower().replace('/', '').replace(' ', '-')})\n"
+            content = content.replace("{{categories_toc}}", categories_toc)
+            
+            # 生成分类内容
+            categories_content = ""
+            for category, repos in sorted(categories.items()):
+                categories_content += f"#### {category}\n\n"
+                
+                # 排序仓库（如果配置了排序方式）
+                sort_by = config["readme"].get("sort_by", "starred_at")
+                sort_order = config["readme"].get("sort_order", "desc")
+                
+                # 根据配置排序仓库
+                if sort_by in ["starred_at", "stars", "updated_at"]:
+                    if sort_by == "stars":
+                        sort_key = "stargazers_count"
+                    else:
+                        sort_key = sort_by
+                    
+                    # 排序，处理可能不存在的键
+                    sorted_repos = sorted(repos, 
+                                          key=lambda x: x.get(sort_key, 0) if sort_key in x else 0, 
+                                          reverse=(sort_order == "desc"))
+                else:
+                    # 默认不排序
+                    sorted_repos = repos
+                
+                # 限制每个分类显示的仓库数量
+                max_repos = config["readme"].get("max_repos_per_category", 0)
+                if max_repos > 0:
+                    sorted_repos = sorted_repos[:max_repos]
+                
+                # 添加仓库内容
+                for repo_data in sorted_repos:
+                    categories_content += repo_data["markdown"]
+                
+                categories_content += "\n"
+            
+            content = content.replace("{{categories_content}}", categories_content)
+            
+            # 写入README文件
+            with open(output_file, 'w', encoding='utf-8') as f:
+                f.write(content)
+                
+            logger.info(f"使用模板更新README.md完成: {output_file}")
+            
+        except Exception as e:
+            logger.error(f"使用模板更新README.md失败: {str(e)}")
+            # 回退到基本方式更新README
+            _update_readme_basic(repos_data, categories)
+    else:
+        logger.warning(f"模板文件不存在: {template_file}，使用基本方式更新README")
+        # 使用基本方式更新README
+        _update_readme_basic(repos_data, categories)
+
+# 基本方式更新README（不使用模板）
+def _update_readme_basic(repos_data, categories):
+    """使用基本方式更新README.md（不使用模板）
+    
+    Args:
+        repos_data: 仓库数据列表
+        categories: 按分类组织的仓库数据
+    """
+    try:
+        # 导入配置
+        from config import config
+        output_file = config["readme"]["output_file"]
         
-        # 添加项目简介
-        f.write("## GitHub Star项目自动管理系统\n\n")
-        f.write("这是一个自动化的GitHub Star项目管理系统，通过GitHub Actions定期更新我的star项目列表。\n\n")
-        
-        # 添加功能介绍
-        f.write("### 功能\n")
-        f.write("- 自动获取我的GitHub star项目\n")
-        f.write("- 使用AI进行项目分类和摘要生成\n")
-        f.write("- 自动更新项目信息到本README\n")
-        f.write("- 每天自动运行更新\n\n")
-        
-        # 添加分类统计
-        f.write("### 分类统计\n\n")
-        f.write("| 分类 | 数量 |\n")
-        f.write("| --- | --- |\n")
-        for category, repos in sorted(categories.items()):
-            f.write(f"| {category} | {len(repos)} |\n")
-        f.write("\n")
-        
-        # 按分类展示项目
-        f.write("### 项目列表\n\n")
-        
-        # 创建分类目录
-        f.write("#### 目录\n\n")
-        for category in sorted(categories.keys()):
-            f.write(f"- [{category}](#user-content-{category.lower().replace('/', '').replace(' ', '-')})\n")
-        f.write("\n")
-        
-        # 按分类展示项目
-        for category, repos in sorted(categories.items()):
-            f.write(f"#### {category}\n\n")
-            for repo_data in repos:
-                f.write(repo_data["markdown"])
+        # 写入README
+        with open(output_file, 'w', encoding='utf-8') as f:
+            f.write("# 我的GitHub Star项目 [![Update Starred Repos](https://github.com/gandli/github-star-manager/actions/workflows/update_stars.yml/badge.svg)](https://github.com/gandli/github-star-manager/actions/workflows/update_stars.yml)\n\n")
+            f.write(f"最后更新: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
+            
+            # 添加项目简介
+            f.write("## GitHub Star项目自动管理系统\n\n")
+            f.write("这是一个自动化的GitHub Star项目管理系统，通过GitHub Actions定期更新我的star项目列表。\n\n")
+            
+            # 添加功能介绍
+            f.write("### 功能\n")
+            f.write("- 自动获取我的GitHub star项目\n")
+            f.write("- 使用AI进行项目分类和摘要生成\n")
+            f.write("- 自动更新项目信息到本README\n")
+            f.write("- 每天自动运行更新\n\n")
+            
+            # 添加分类统计
+            f.write("### 分类统计\n\n")
+            f.write("| 分类 | 数量 |\n")
+            f.write("| --- | --- |\n")
+            for category, repos in sorted(categories.items()):
+                f.write(f"| {category} | {len(repos)} |\n")
             f.write("\n")
-        
-    logger.info("README.md更新完成")
+            
+            # 按分类展示项目
+            f.write("### 项目列表\n\n")
+            
+            # 创建分类目录
+            f.write("#### 目录\n\n")
+            for category in sorted(categories.keys()):
+                f.write(f"- [{category}](#user-content-{category.lower().replace('/', '').replace(' ', '-')})\n")
+            f.write("\n")
+            
+            # 按分类展示项目
+            for category, repos in sorted(categories.items()):
+                f.write(f"#### {category}\n\n")
+                
+                # 排序仓库（如果配置了排序方式）
+                sort_by = config["readme"].get("sort_by", "starred_at")
+                sort_order = config["readme"].get("sort_order", "desc")
+                
+                # 根据配置排序仓库
+                if sort_by in ["starred_at", "stars", "updated_at"]:
+                    if sort_by == "stars":
+                        sort_key = "stargazers_count"
+                    else:
+                        sort_key = sort_by
+                    
+                    # 排序，处理可能不存在的键
+                    sorted_repos = sorted(repos, 
+                                          key=lambda x: x.get(sort_key, 0) if sort_key in x else 0, 
+                                          reverse=(sort_order == "desc"))
+                else:
+                    # 默认不排序
+                    sorted_repos = repos
+                
+                # 限制每个分类显示的仓库数量
+                max_repos = config["readme"].get("max_repos_per_category", 0)
+                if max_repos > 0:
+                    sorted_repos = sorted_repos[:max_repos]
+                
+                for repo_data in sorted_repos:
+                    f.write(repo_data["markdown"])
+                f.write("\n")
+            
+        logger.info(f"基本方式更新README.md完成: {output_file}")
+    except Exception as e:
+        logger.error(f"基本方式更新README.md失败: {str(e)}")
+        raise
 
 # 保存仓库数据到JSON文件
 def save_repos_data(repos_data, filename="repos_data.json"):
     """保存仓库数据到JSON文件，用于缓存和分析"""
     try:
+        # 导入配置
+        from config import config
+        
+        # 如果未指定输出文件，则使用配置中的路径
+        if filename == "repos_data.json":
+            filename = os.path.join(config["storage"]["data_dir"], config["storage"]["repos_file"])
+        
+        # 确保目录存在
+        os.makedirs(os.path.dirname(filename), exist_ok=True)
+        
         # 转换datetime对象为字符串
         for repo in repos_data:
             if "updated_at" in repo and hasattr(repo["updated_at"], "strftime"):
@@ -165,9 +439,15 @@ if __name__ == "__main__":
     try:
         logger.info("开始执行GitHub Star项目自动管理系统")
         
+        # 导入配置
+        from config import config
+        
         # 初始化AI处理器
         logger.info("初始化AI处理器")
-        ai_processor = AIProcessor()
+        ai_token = os.getenv("GH_TOKEN")
+        if not ai_token:
+            logger.warning("未设置GH_TOKEN环境变量，将使用启发式分类方法")
+        ai_processor = AIProcessor(ai_token)
         
         # 初始化GitHub客户端并获取star项目
         logger.info("初始化GitHub客户端")
@@ -178,36 +458,74 @@ if __name__ == "__main__":
         
         # 收集仓库数据
         repos_data = []
-        total_repos = 0
+        processed_count = 0
+        error_count = 0
         
-        # 计算总数
+        # 获取总数
         try:
             total_repos = starred_repos.totalCount
             logger.info(f"共找到 {total_repos} 个star项目")
-        except:
-            logger.warning("无法获取star项目总数")
+        except Exception as e:
+            logger.warning(f"无法获取star项目总数: {str(e)}")
+            total_repos = "未知"
+        
+        # 处理所有仓库数据
+        logger.info("开始处理仓库数据")
+        
+        # 设置进度报告间隔
+        progress_interval = config.get("processing", {}).get("progress_interval", 10)  # 每处理10个仓库报告一次进度
+        
+        # 使用分页方式处理仓库
+        for i, repo in enumerate(starred_repos):
+            try:
+                # 报告进度
+                if i > 0 and i % progress_interval == 0:
+                    logger.info(f"已处理 {i} 个仓库，总计 {total_repos} ({i/float(total_repos)*100:.1f}%)")
+                
+                # 转换为字典并处理
+                repo_dict = repo_to_dict(repo)
+                
+                # 使用AI处理器进行分类和摘要生成
+                repo_dict["category"] = ai_processor.classify_repository(repo_dict)
+                repo_dict["summary"] = ai_processor.generate_summary(repo_dict)
+                
+                # 添加到数据列表
+                repos_data.append(repo_dict)
+                processed_count += 1
+                
+            except Exception as e:
+                logger.error(f"处理仓库 {repo.name if hasattr(repo, 'name') else '未知'} 数据时出错: {str(e)}")
+                error_count += 1
+                # 尝试添加基本信息
+                try:
+                    basic_dict = {
+                        "name": repo.name if hasattr(repo, 'name') else "未知",
+                        "html_url": repo.html_url if hasattr(repo, 'html_url') else "#",
+                        "category": "未分类",
+                        "description": "获取信息时出错"
+                    }
+                    repos_data.append(basic_dict)
+                except:
+                    pass
+        
+        logger.info(f"仓库数据处理完成，成功: {processed_count}，失败: {error_count}")
+        
+        # 保存数据到JSON文件
+        try:
+            data_file = os.path.join(config["storage"]["data_dir"], config["storage"]["repos_file"])
+            save_repos_data(repos_data, data_file)
+            logger.info(f"仓库数据已保存到 {data_file}")
+        except Exception as e:
+            logger.error(f"保存仓库数据时出错: {str(e)}")
         
         # 更新README
         logger.info("开始更新README")
-        update_readme(starred_repos, ai_processor)
+        update_readme(repos_data, ai_processor)
         
-        # 保存仓库数据
-        try:
-            # 收集所有仓库数据用于保存
-            repos_data = []
-            for repo in starred_repos:
-                try:
-                    repo_dict = repo_to_dict(repo)
-                    repo_dict["category"] = ai_processor.classify_repository(repo_dict)
-                    repo_dict["summary"] = ai_processor.generate_summary(repo_dict)
-                    repos_data.append(repo_dict)
-                except Exception as e:
-                    logger.error(f"处理仓库 {repo.name} 数据时出错: {str(e)}")
-            
-            # 保存数据到JSON文件
-            save_repos_data(repos_data)
-        except Exception as e:
-            logger.error(f"保存仓库数据时出错: {str(e)}")
+        # 报告AI处理器缓存统计
+        if hasattr(ai_processor, 'get_cache_stats'):
+            cache_stats = ai_processor.get_cache_stats()
+            logger.info(f"AI处理器缓存统计: {cache_stats}")
         
         logger.info("处理完成")
     except Exception as e:
