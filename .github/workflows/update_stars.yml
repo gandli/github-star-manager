@@ -24,7 +24,7 @@ jobs:
     
     - name: Run star updater
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
         # 后续可添加AI API密钥
       run: python src/update_stars.py
     
