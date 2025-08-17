@@ -18,8 +18,8 @@ CONFIG = {
     # AI处理配置
     "ai": {
         "token": os.getenv("GITHUB_TOKEN"),  # AI API令牌
-        "api_url": "https://api.github.com/copilot/completions",
-        "model": "github-copilot",
+        "api_url": "https://models.github.ai/inference/chat/completions",
+        "model": "openai/gpt-4.1",
         "max_tokens": 300,
         "temperature": 0.5,
         "timeout": 30,  # API调用超时时间（秒）

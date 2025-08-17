@@ -150,12 +150,15 @@ class AIProcessor:
                 headers = {
                     "Authorization": f"Bearer {self.api_key}",
                     "Content-Type": "application/json",
-                    "Accept": "application/json",
+                    "Accept": "application/vnd.github+json",
+                    "X-GitHub-Api-Version": "2022-11-28",
                 }
 
                 data = {
                     "model": config["ai"]["model"],
-                    "prompt": prompt,
+                    "messages": [
+                        {"role": "user", "content": prompt}
+                    ],
                     "max_tokens": config["ai"]["max_tokens"],
                     "temperature": config["ai"]["temperature"],
                 }
@@ -188,7 +191,7 @@ class AIProcessor:
                         raise Exception(error_msg)
 
                 result = response.json()
-                response_text = result.get("choices", [{}])[0].get("text", "")
+                response_text = result.get("choices", [{}])[0].get("message", {}).get("content", "")
                 logger.debug(f"API调用成功，响应长度: {len(response_text)}")
                 return response_text
                 
