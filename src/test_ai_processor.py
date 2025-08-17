@@ -74,7 +74,7 @@ def test_ai_processor():
                 "full_name": "EbookFoundation/free-programming-books",
                 "html_url": "https://github.com/EbookFoundation/free-programming-books",
                 "description": "📚 Freely available programming books",
-                "language": null,
+                "language": None,
                 "stargazers_count": 270000,
                 "topics": ["books", "education", "programming", "resources"]
             }

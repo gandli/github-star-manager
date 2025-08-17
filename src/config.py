@@ -17,7 +17,7 @@ CONFIG = {
     },
     # AI处理配置
     "ai": {
-        "token": os.getenv("GH_PAT"),  # AI API令牌
+        "token": os.getenv("GITHUB_TOKEN"),  # AI API令牌
         "api_url": "https://api.github.com/copilot/completions",
         "model": "github-copilot",
         "max_tokens": 300,
