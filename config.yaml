@@ -1,0 +1,21 @@
+# GitHub Star Manager配置文件
+
+# 基本配置
+username: "USERNAME"  # 替换为您的GitHub用户名
+update_interval: 7    # 更新频率（天）
+max_stars: 100        # 最大获取的Star项目数量
+
+# AI配置
+ai_model: "glm-4.5-flash"  # 使用的AI模型
+ai_api_url: "https://open.bigmodel.cn/api/paas/v4/chat/completions"  # AI API地址
+
+# 分类配置
+categories:
+  - 前端开发
+  - 后端开发
+  - 机器学习
+  - 数据科学
+  - 开发工具
+  - 系统工具
+  - 学习资源
+  - 其他
