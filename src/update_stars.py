@@ -4,7 +4,7 @@ from datetime import datetime
 
 # 初始化GitHub客户端
 def init_github_client():
-    token = os.getenv('GITHUB_TOKEN')
+    token = os.getenv('GH_TOKEN')
     return Github(token)
 
 # 获取用户star的项目
