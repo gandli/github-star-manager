@@ -3,7 +3,7 @@ name: Update Starred Repos
 on:
   schedule:
     - cron: "0 0 * * *" # 每天UTC时间0点运行
-  workflow_dispatch:
+  workflow_dispatch: # 允许手动触发
 
 jobs:
   update-stars:
@@ -20,12 +20,12 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install PyGithub python-dotenv
+          pip install PyGithub python-dotenv requests logging
 
       - name: Run star updater
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # 后续可添加AI API密钥
+          GITHUB_AI_TOKEN: ${{ secrets.GITHUB_AI_TOKEN }} # GitHub AI API密钥
         run: python src/update_stars.py
 
       - name: Commit and push changes
