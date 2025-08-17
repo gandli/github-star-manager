@@ -23,12 +23,12 @@
 
 1. Fork本仓库
 2. 在仓库设置中添加以下Secrets:
-   - `GH_TOKEN`: GitHub个人访问令牌，需要有`repo`和`user`权限
+   - `GH_PAT`: GitHub个人访问令牌，需要有`repo`和`user`权限
    - `AI_API_KEY`: AI API密钥（用于智能分类和摘要生成）
 3. 启用GitHub Actions
 
-> **注意**: 在GitHub Actions环境中，系统会自动获取仓库所有者的用户名，无需手动修改`config.yaml`文件中的`username`字段。如果您需要管理其他用户的Star项目，可以通过以下两种方式：
-> 1. 在GitHub Actions工作流中设置`GITHUB_USERNAME`环境变量（可以使用`${{ github.actor }}`获取当前触发工作流的用户名）
+> **注意**: 在GitHub Actions环境中，系统会自动获取仓库所有者的用户名，无需手动修改`config.yaml`文件中的`username`字段。默认情况下，工作流使用`${{ github.repository_owner }}`（仓库所有者）作为用户名。如果您需要管理其他用户的Star项目，可以通过以下两种方式：
+> 1. 在GitHub Actions工作流中设置`GITHUB_USERNAME`环境变量为其他值（例如使用`${{ github.actor }}`获取当前触发工作流的用户名）
 > 2. 手动修改`config.yaml`文件中的`username`字段
 
 ### 本地运行

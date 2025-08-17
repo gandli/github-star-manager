@@ -108,6 +108,7 @@ def main():
     max_stars = config.get('max_stars', 100)
     
     # 首先检查是否设置了GITHUB_USERNAME环境变量（优先级最高）
+    # 在GitHub Actions工作流中，这个变量通常设置为github.repository_owner
     username = os.environ.get('GITHUB_USERNAME')
     if username:
         print(f"使用环境变量中的用户名: {username}")
@@ -115,6 +116,8 @@ def main():
     elif os.environ.get('GITHUB_ACTIONS') == 'true':
         # 从GITHUB_REPOSITORY环境变量中提取用户名 (格式: owner/repo)
         # 这是GitHub Actions的标准上下文变量
+        # 注意：在工作流中我们已经通过github.repository_owner设置了GITHUB_USERNAME，
+        # 所以这部分代码主要作为备用逻辑
         github_repository = os.environ.get('GITHUB_REPOSITORY', '')
         if '/' in github_repository:
             username = github_repository.split('/')[0]
