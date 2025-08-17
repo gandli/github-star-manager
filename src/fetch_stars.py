@@ -105,11 +105,24 @@ def main():
     
     # 加载配置
     config = load_config()
-    username = config.get('username')
     max_stars = config.get('max_stars', 100)
     
-    if username == "USERNAME":
-        print("错误: 请在config.yaml中设置您的GitHub用户名")
+    # 在GitHub Actions环境中自动获取仓库所有者用户名
+    if os.environ.get('GITHUB_ACTIONS') == 'true':
+        # 从GITHUB_REPOSITORY环境变量中提取用户名 (格式: owner/repo)
+        github_repository = os.environ.get('GITHUB_REPOSITORY', '')
+        if '/' in github_repository:
+            username = github_repository.split('/')[0]
+            print(f"在GitHub Actions中自动获取用户名: {username}")
+        else:
+            # 如果无法从GITHUB_REPOSITORY获取，则使用配置文件中的用户名
+            username = config.get('username')
+    else:
+        # 本地运行时使用配置文件中的用户名
+        username = config.get('username')
+    
+    if not username:
+        print("错误: 无法获取GitHub用户名，请在config.yaml中设置username或确保在GitHub Actions环境中运行")
         sys.exit(1)
     
     # 创建输出目录
