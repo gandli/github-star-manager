@@ -429,8 +429,10 @@ def main():
         print("Commands:")
         print("  create-dirs - Create necessary directories")
         print("  check-changes - Check for git changes")
+        print("  commit-changes <fetch_mode> <event_name> <run_number> <skip_classification> - Commit changes")
+        print("  push-changes - Push changes to remote")
         print("  commit-push <fetch_mode> <workflow_run> <skip_classification> - Commit and push changes")
-        print("  summary <fetch_mode> <workflow_run> <github_event> <skip_classification> <workflow_url> - Generate execution summary")
+        print("  summary <created_at> <fetch_mode> <event_name> <run_number> <workflow_url> <skip_classification> <has_changes> - Generate execution summary")
         print("  cleanup - Clean temporary files")
         print("  diagnostics <workflow_run> <github_event> - Run failure diagnosis")
         sys.exit(1)
@@ -444,16 +446,29 @@ def main():
     
     elif command == "check-changes":
         has_changes, files = utils.check_file_changes()
-        print(f"has_changes={str(has_changes).lower()}")
+        # 设置GitHub Actions输出变量
+        print(f"::set-output name=has_changes::{str(has_changes).lower()}")
         if files:
-            print(f"changed_files={','.join(files)}")
+            print(f"::set-output name=changed_files::{','.join(files)}")
+    
+    elif command == "commit-changes" and len(sys.argv) >= 6:
+        fetch_mode = sys.argv[2]
+        event_name = sys.argv[3]
+        run_number = sys.argv[4]
+        skip_classification = sys.argv[5] if len(sys.argv) > 5 else "false"
+        success = utils.commit_changes(fetch_mode, event_name, run_number, skip_classification)
+        exit(0 if success else 1)
+    
+    elif command == "push-changes":
+        success = utils.push_changes()
+        exit(0 if success else 1)
     
     elif command == "commit-push" and len(sys.argv) >= 5:
         fetch_mode = sys.argv[2]
         workflow_run = sys.argv[3]
         skip_classification = sys.argv[4].lower() == 'true'
         success = utils.commit_and_push_changes(
-            fetch_mode, workflow_run, skip_classification
+            workflow_run, fetch_mode, "manual", skip_classification
         )
         exit(0 if success else 1)
     
