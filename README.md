@@ -19,35 +19,39 @@
 
 ### 📊 项目统计
 
-- **总项目数**: 4,186
-- **已分类项目**: 0
-- **未分类项目**: 4,186
-- **分类完成率**: 0.0%
+- **总项目数**: 10
+- **已分类项目**: 10
+- **未分类项目**: 0
+- **分类完成率**: 100.0%
+
+### 📂 分类概览
+
+| 分类 | 项目数量 | 文档链接 |
+|------|----------|----------|
+| 机器学习 | 7 | [📖 查看详情](docs/机器学习.md) |
+| 数据科学 | 1 | [📖 查看详情](docs/数据科学.md) |
+| 开发工具 | 1 | [📖 查看详情](docs/开发工具.md) |
+| 移动应用 | 1 | [📖 查看详情](docs/移动应用.md) |
 
 ### 💻 主要编程语言
 
 | 语言 | 项目数量 | 占比 |
 |------|----------|------|
-| TypeScript | 752 | 18.0% |
-| Python | 715 | 17.1% |
-| JavaScript | 601 | 14.4% |
-| 未知 | 404 | 9.7% |
-| Go | 212 | 5.1% |
-| Shell | 167 | 4.0% |
-| Swift | 128 | 3.1% |
-| Vue | 126 | 3.0% |
-| Rust | 124 | 3.0% |
-| C++ | 123 | 2.9% |
+| TypeScript | 4 | 40.0% |
+| Jupyter Notebook | 2 | 20.0% |
+| Python | 2 | 20.0% |
+| Shell | 1 | 10.0% |
+| Dart | 1 | 10.0% |
 
 ### 🕒 更新信息
 
-- **最后更新时间**: 2025-08-18 16:21:33
+- **最后更新时间**: 2025-08-18 17:05:37
 - **最近添加的项目**:
-  - [ios-dev-flow](https://github.com/leecade/ios-dev-flow)
-  - [pentest_study](https://github.com/l3m0n/pentest_study)
-  - [awesome-awesomeness-zh_CN](https://github.com/justjavac/awesome-awesomeness-zh_CN)
-  - [ew](https://github.com/idlefire/ew)
-  - [TaskbarTools](https://github.com/Elestriel/TaskbarTools)
+  - [langchain](https://github.com/langchain-ai/langchain)
+  - [gptme](https://github.com/gptme/gptme)
+  - [flutter](https://github.com/flutter/flutter)
+  - [vscodium](https://github.com/VSCodium/vscodium)
+  - [pytorch](https://github.com/pytorch/pytorch)
 
 📋 [查看完整分类索引](docs/index.md)
 
