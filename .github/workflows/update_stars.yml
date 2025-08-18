@@ -91,84 +91,17 @@ jobs:
       # 4. 验证环境变量
       - name: 🔍 验证环境配置
         run: |
-          echo "🔧 检查必需的环境变量..."
-          
-          # 检查GitHub相关变量
-          if [ -z "${{ secrets.GH_PAT }}" ]; then
-            echo "❌ GH_PAT secret is not set"
-            echo "💡 请在仓库设置中添加 GH_PAT secret"
-            exit 1
-          else
-            echo "✅ GH_PAT secret 已配置"
-          fi
-          
-          # GITHUB_USERNAME 可以通过 github.actor 自动获取，无需设置 secret
-          echo "✅ GITHUB_USERNAME 将使用 github.actor: ${{ github.actor }}"
-          
-          # 检查AI相关变量（如果不跳过分类）
-          if [ "${{ github.event.inputs.skip_classification }}" != "true" ]; then
-            if [ -z "${{ secrets.AI_API_KEY }}" ]; then
-              echo "❌ AI_API_KEY secret is not set"
-              echo "💡 请在仓库设置中添加 AI_API_KEY secret，或使用 skip_classification 参数跳过AI分类"
-              exit 1
-            else
-              echo "✅ AI_API_KEY secret 已配置"
-            fi
-            
-            if [ -z "${{ secrets.AI_ACCOUNT_ID }}" ]; then
-              echo "❌ AI_ACCOUNT_ID secret is not set"
-              echo "💡 请在仓库设置中添加 AI_ACCOUNT_ID secret，或使用 skip_classification 参数跳过AI分类"
-              exit 1
-            else
-              echo "✅ AI_ACCOUNT_ID secret 已配置"
-            fi
-          else
-            echo "⏭️ 跳过AI分类，无需验证AI相关secrets"
-          fi
-          
-          echo "✅ 环境变量验证通过"
+          python src/env_check.py --secrets-only ${{ github.event.inputs.skip_classification == 'true' && '--skip-classification' || '' }}
       
       # 5. 健康检查
       - name: 🏥 系统健康检查
         run: |
-          echo "🏥 执行系统健康检查..."
-          
-          # 检查磁盘空间
-          available_space=$(df . | tail -1 | awk '{print $4}')
-          if [ "$available_space" -lt 1048576 ]; then  # 小于1GB
-            echo "⚠️ 磁盘空间不足: $(df -h . | tail -1 | awk '{print $4}') 可用"
-          else
-            echo "✅ 磁盘空间充足: $(df -h . | tail -1 | awk '{print $4}') 可用"
-          fi
-          
-          # 检查网络连接
-          if curl -s --max-time 10 https://api.github.com/rate_limit > /dev/null; then
-            echo "✅ GitHub API 连接正常"
-          else
-            echo "❌ GitHub API 连接失败"
-            exit 1
-          fi
-          
-          # 检查Python环境
-          python_version=$(python --version 2>&1)
-          echo "✅ Python环境: $python_version"
-          
-          echo "✅ 系统健康检查通过"
+          python src/env_check.py --health-check ${{ github.event.inputs.skip_classification == 'true' && '--skip-classification' || '' }}
       
       # 6. 创建必要的目录
       - name: 📁 创建目录结构
         run: |
-          echo "📁 创建项目目录结构..."
-          mkdir -p data
-          mkdir -p docs
-          mkdir -p logs
-          
-          # 设置目录权限
-          chmod 755 data docs logs
-          
-          echo "✅ 目录结构创建完成"
-          echo "📋 目录列表:"
-          ls -la | grep '^d'
+          python src/workflow_utils.py create-dirs
       
       # 7. 设置运行时环境变量
       - name: ⚙️ 配置运行环境
