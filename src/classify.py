@@ -183,7 +183,10 @@ URL：{{}}
         """
         # 尝试直接解析JSON
         try:
-            return json.loads(response_text.strip())
+            parsed_result = json.loads(response_text.strip())
+            # 确保结果是字典类型，而不是字符串或其他类型
+            if isinstance(parsed_result, dict):
+                return parsed_result
         except json.JSONDecodeError:
             pass
         
