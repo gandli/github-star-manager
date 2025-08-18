@@ -217,7 +217,7 @@ URL：{{}}
                 key_value_pattern = r'"([^"]+)"\s*:\s*([^\n]+)'
                 matches = re.findall(key_value_pattern, cleaned_text)
                 
-                if matches:
+                if matches and len(matches) >= 2:  # 至少需要2个键值对才能构成有效分类
                     # 构建JSON对象
                     json_parts = []
                     for key, value in matches:
