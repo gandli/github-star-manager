@@ -1,0 +1,125 @@
+{
+  "metadata": {
+    "total_count": 3,
+    "fetch_mode": "full",
+    "last_fetch_time": "2025-08-18T15:36:36.739750+00:00",
+    "username": "gandli"
+  },
+  "repositories": [
+    {
+      "id": 1039227029,
+      "name": "doxx",
+      "full_name": "bgreenwell/doxx",
+      "description": "Expose the contents of .docx files without leaving your terminal. Fast, safe, and smart — no Office required!",
+      "html_url": "https://github.com/bgreenwell/doxx",
+      "clone_url": "https://github.com/bgreenwell/doxx.git",
+      "language": "Rust",
+      "stargazers_count": 800,
+      "forks_count": 9,
+      "open_issues_count": 9,
+      "topics": [],
+      "created_at": "2025-08-16T18:48:24Z",
+      "updated_at": "2025-08-18T15:35:20Z",
+      "pushed_at": "2025-08-18T13:21:38Z",
+      "size": 375,
+      "default_branch": "main",
+      "archived": false,
+      "disabled": false,
+      "private": false,
+      "fork": false,
+      "owner": {
+        "login": "bgreenwell",
+        "type": "User"
+      },
+      "license": null,
+      "starred_at": "2025-08-18T15:36:01.981435+00:00",
+      "is_classified": true,
+      "category": "开发工具",
+      "summary": "doxx是一个快速、安全、智能的命令行工具，用于在终端中暴露.docx文件内容，无需安装Office软件。",
+      "key_features": [
+        "快速解析.docx文件",
+        "安全且无需安装Office",
+        "智能的命令行接口"
+      ]
+    },
+    {
+      "id": 90568316,
+      "name": "Learn-Web-Hacking",
+      "full_name": "LyleMi/Learn-Web-Hacking",
+      "description": "Study Notes For Web Hacking / Web安全学习笔记",
+      "html_url": "https://github.com/LyleMi/Learn-Web-Hacking",
+      "clone_url": "https://github.com/LyleMi/Learn-Web-Hacking.git",
+      "language": "Python",
+      "stargazers_count": 4980,
+      "forks_count": 910,
+      "open_issues_count": 2,
+      "topics": [
+        "hacking",
+        "penetration-testing",
+        "pentesting",
+        "security",
+        "study-notes",
+        "web-hacking"
+      ],
+      "created_at": "2017-05-07T23:28:42Z",
+      "updated_at": "2025-08-18T14:30:52Z",
+      "pushed_at": "2025-02-11T12:43:34Z",
+      "size": 1607,
+      "default_branch": "master",
+      "archived": false,
+      "disabled": false,
+      "private": false,
+      "fork": false,
+      "owner": {
+        "login": "LyleMi",
+        "type": "User"
+      },
+      "license": "Creative Commons Zero v1.0 Universal",
+      "starred_at": "2025-08-18T15:36:01.981453+00:00",
+      "is_classified": true,
+      "category": "网络安全",
+      "summary": "Learn-Web-Hacking 是一个用于学习 Web 安全的笔记项目，涵盖了 Web 漏洞利用、渗透测试和安全研究等方面的知识。该项目使用 Python 编写，提供了一个全面且易于使用的学习资源。",
+      "key_features": [
+        "Web 漏洞利用",
+        "渗透测试",
+        "安全研究"
+      ]
+    },
+    {
+      "id": 232303885,
+      "name": "shiro_rce_tool",
+      "full_name": "wyzxxz/shiro_rce_tool",
+      "description": "shiro 反序列 命令执行辅助检测工具",
+      "html_url": "https://github.com/wyzxxz/shiro_rce_tool",
+      "clone_url": "https://github.com/wyzxxz/shiro_rce_tool.git",
+      "language": null,
+      "stargazers_count": 1518,
+      "forks_count": 182,
+      "open_issues_count": 22,
+      "topics": [],
+      "created_at": "2020-01-07T10:47:41Z",
+      "updated_at": "2025-08-18T02:59:41Z",
+      "pushed_at": "2024-05-21T02:57:22Z",
+      "size": 37644,
+      "default_branch": "master",
+      "archived": false,
+      "disabled": false,
+      "private": false,
+      "fork": false,
+      "owner": {
+        "login": "wyzxxz",
+        "type": "User"
+      },
+      "license": null,
+      "starred_at": "2025-08-18T15:36:01.981457+00:00",
+      "is_classified": true,
+      "category": "网络安全",
+      "summary": "Shiro 反序列化命令执行辅助检测工具，帮助用户检测和利用 Shiro 反序列化漏洞进行命令执行",
+      "key_features": [
+        "Shiro 反序列化漏洞检测",
+        "命令执行辅助工具",
+        "安全检测"
+      ]
+    }
+  ]
+}

@@ -14,9 +14,5 @@ env/
 *.swp
 *.swo
 
-# 本地测试数据
-/data/*.json
-!/data/.gitkeep
-
 # 环境变量文件
 .env
