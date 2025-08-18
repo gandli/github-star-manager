@@ -352,7 +352,7 @@ flake8 src/
 
 - 提交 [Issue](https://github.com/your-username/github-star-manager/issues)
 - 发起 [Discussion](https://github.com/your-username/github-star-manager/discussions)
-- 邮件：your-email@example.com
+- 邮件：gandli@qq.com
 
 ---
 
