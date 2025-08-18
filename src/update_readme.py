@@ -16,7 +16,7 @@ import logging
 from datetime import datetime
 from typing import Dict, Any, List, Tuple
 import yaml
-from data_manager import DataManager
+from .data_manager import DataManager
 
 
 class ReadmeUpdater:
@@ -30,7 +30,7 @@ class ReadmeUpdater:
         """
         self.config = self._load_config(config_path)
         self.data_manager = DataManager(config_path)
-        self.readme_path = self.config['docs']['readme_path']
+        self.readme_path = self.config['docs']['readme_file']
         self.docs_dir = self.config['docs']['output_dir']
         self.logger = self._setup_logger()
         

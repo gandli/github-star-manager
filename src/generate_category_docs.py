@@ -14,7 +14,7 @@ import logging
 from datetime import datetime
 from typing import List, Dict, Any
 import yaml
-from data_manager import DataManager
+from .data_manager import DataManager
 
 
 class CategoryDocGenerator:

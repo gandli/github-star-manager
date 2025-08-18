@@ -79,12 +79,12 @@ jobs:
       # 4. 验证环境配置
       - name: 🔍 验证环境配置
         run: |
-          python src/env_check.py --secrets-only ${{ github.event.inputs.skip_classification == 'true' && '--skip-classification' || '' }}
+          python -m src.env_check --secrets-only ${{ github.event.inputs.skip_classification == 'true' && '--skip-classification' || '' }}
       
       # 5. 创建必要的目录
       - name: 📁 创建目录结构
         run: |
-          python src/workflow_utils.py create-dirs
+          python -m src.workflow_utils create-dirs
       
       # 6. 设置运行时环境变量
       - name: ⚙️ 配置运行环境
@@ -110,9 +110,9 @@ jobs:
           echo "🚀 开始获取GitHub Star项目..."
           echo "📋 获取模式: $FETCH_MODE"
           
-          if python src/fetch_stars.py; then
+          if python -m src.fetch_stars; then
             echo "✅ Star项目获取成功"
-            python src/stats.py project_stats
+            python -m src.stats project_stats
           else
             echo "❌ Star项目获取失败"
             exit 1
@@ -126,16 +126,16 @@ jobs:
           echo "🧠 开始AI智能分类..."
           
           if [ -f "data/stars_data.json" ]; then
-            unclassified_count=$(python src/stats.py unclassified)
+            unclassified_count=$(python -m src.stats unclassified)
             
             if [ "$unclassified_count" -eq "0" ]; then
               echo "📝 所有项目已分类，跳过AI分类步骤"
             else
               echo "📊 发现 $unclassified_count 个未分类项目，开始AI分类..."
               
-              if python src/classify.py data/stars_data.json; then
+              if python -m src.classify data/stars_data.json; then
                 echo "✅ AI分类完成"
-                python src/stats.py classification
+                python -m src.stats classification
               else
                 echo "❌ AI分类失败"
                 exit 1
@@ -149,31 +149,31 @@ jobs:
       - name: 📝 生成分类文档
         run: |
           echo "📚 开始生成分类文档..."
-          python src/generate_category_docs.py
+          python -m src.generate_category_docs
           echo "✅ 分类文档生成完成"
       
       # 10. 更新README
       - name: 📖 更新README文件
         run: |
           echo "📝 开始更新README..."
-          python src/update_readme.py
+          python -m src.update_readme
           echo "✅ README更新完成"
       
       # 11. 检查文件变更
       - name: 🔍 检查文件变更
         id: check_changes
         run: |
-          python src/workflow_utils.py check-changes
+          python -m src.workflow_utils check-changes
       
       # 12. 提交并推送变更
       - name: 💾 提交并推送变更
         if: steps.check_changes.outputs.has_changes == 'true'
         run: |
-          python src/workflow_utils.py commit-changes "$FETCH_MODE" "${{ github.event_name }}" "${{ github.run_number }}" "${{ github.event.inputs.skip_classification }}"
-          python src/workflow_utils.py push-changes
+          python -m src.workflow_utils commit-changes "$FETCH_MODE" "${{ github.event_name }}" "${{ github.run_number }}" "${{ github.event.inputs.skip_classification }}"
+          python -m src.workflow_utils push-changes
       
       # 13. 生成执行摘要
       - name: 📊 生成执行摘要
         if: always()
         run: |
-          python src/workflow_utils.py summary "${{ github.event.created_at }}" "$FETCH_MODE" "${{ github.event_name }}" "${{ github.run_number }}" "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" "${{ github.event.inputs.skip_classification }}" "${{ steps.check_changes.outputs.has_changes }}"
+          python -m src.workflow_utils summary "${{ github.event.created_at }}" "$FETCH_MODE" "${{ github.event_name }}" "${{ github.run_number }}" "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" "${{ github.event.inputs.skip_classification }}" "${{ steps.check_changes.outputs.has_changes }}"
