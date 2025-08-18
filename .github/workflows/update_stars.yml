@@ -34,14 +34,23 @@ on:
 
 # 环境变量
 env:
-  PYTHON_VERSION: '3.9'
+  PYTHON_VERSION: '3.11'  # 升级到更新的Python版本以获得更好的性能
   REQUIREMENTS_FILE: 'requirements.txt'
+  PIP_CACHE_DIR: ~/.cache/pip  # 设置pip缓存目录
 
 # 作业定义
 jobs:
   update-stars:
     name: 更新GitHub Star项目
     runs-on: ubuntu-latest
+    
+    # 超时设置（防止工作流无限运行）
+    timeout-minutes: 60
+    
+    # 并发控制（确保同一时间只有一个实例运行）
+    concurrency:
+      group: update-stars-${{ github.ref }}
+      cancel-in-progress: false
     
     # 权限设置
     permissions:
@@ -54,25 +63,30 @@ jobs:
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          fetch-depth: 0
+          fetch-depth: 1  # 浅克隆以提高性能，除非需要完整历史记录
+          persist-credentials: true
       
       # 2. 设置Python环境
       - name: 🐍 设置Python环境
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: 'pip'
+          cache-dependency-path: ${{ env.REQUIREMENTS_FILE }}
       
       # 3. 安装依赖
       - name: 📦 安装Python依赖
         run: |
-          python -m pip install --upgrade pip
+          python -m pip install --upgrade pip setuptools wheel
           if [ -f ${{ env.REQUIREMENTS_FILE }} ]; then
-            pip install -r ${{ env.REQUIREMENTS_FILE }}
+            pip install -r ${{ env.REQUIREMENTS_FILE }} --no-warn-script-location
           else
             echo "⚠️ requirements.txt not found, installing basic dependencies"
-            pip install requests PyYAML
+            pip install requests PyYAML --no-warn-script-location
           fi
+          
+          # 验证关键依赖是否安装成功
+          python -c "import requests, yaml; print('✅ 核心依赖验证通过')"
       
       # 4. 验证环境变量
       - name: 🔍 验证环境配置
@@ -82,35 +96,81 @@ jobs:
           # 检查GitHub相关变量
           if [ -z "${{ secrets.GH_PAT }}" ]; then
             echo "❌ GH_PAT secret is not set"
+            echo "💡 请在仓库设置中添加 GH_PAT secret"
             exit 1
+          else
+            echo "✅ GH_PAT secret 已配置"
           fi
           
           # GITHUB_USERNAME 可以通过 github.actor 自动获取，无需设置 secret
+          echo "✅ GITHUB_USERNAME 将使用 github.actor: ${{ github.actor }}"
           
           # 检查AI相关变量（如果不跳过分类）
           if [ "${{ github.event.inputs.skip_classification }}" != "true" ]; then
             if [ -z "${{ secrets.AI_API_KEY }}" ]; then
               echo "❌ AI_API_KEY secret is not set"
+              echo "💡 请在仓库设置中添加 AI_API_KEY secret，或使用 skip_classification 参数跳过AI分类"
               exit 1
+            else
+              echo "✅ AI_API_KEY secret 已配置"
             fi
             
             if [ -z "${{ secrets.AI_ACCOUNT_ID }}" ]; then
               echo "❌ AI_ACCOUNT_ID secret is not set"
+              echo "💡 请在仓库设置中添加 AI_ACCOUNT_ID secret，或使用 skip_classification 参数跳过AI分类"
               exit 1
+            else
+              echo "✅ AI_ACCOUNT_ID secret 已配置"
             fi
+          else
+            echo "⏭️ 跳过AI分类，无需验证AI相关secrets"
           fi
           
           echo "✅ 环境变量验证通过"
       
-      # 5. 创建必要的目录
+      # 5. 健康检查
+      - name: 🏥 系统健康检查
+        run: |
+          echo "🏥 执行系统健康检查..."
+          
+          # 检查磁盘空间
+          available_space=$(df . | tail -1 | awk '{print $4}')
+          if [ "$available_space" -lt 1048576 ]; then  # 小于1GB
+            echo "⚠️ 磁盘空间不足: $(df -h . | tail -1 | awk '{print $4}') 可用"
+          else
+            echo "✅ 磁盘空间充足: $(df -h . | tail -1 | awk '{print $4}') 可用"
+          fi
+          
+          # 检查网络连接
+          if curl -s --max-time 10 https://api.github.com/rate_limit > /dev/null; then
+            echo "✅ GitHub API 连接正常"
+          else
+            echo "❌ GitHub API 连接失败"
+            exit 1
+          fi
+          
+          # 检查Python环境
+          python_version=$(python --version 2>&1)
+          echo "✅ Python环境: $python_version"
+          
+          echo "✅ 系统健康检查通过"
+      
+      # 6. 创建必要的目录
       - name: 📁 创建目录结构
         run: |
+          echo "📁 创建项目目录结构..."
           mkdir -p data
           mkdir -p docs
           mkdir -p logs
+          
+          # 设置目录权限
+          chmod 755 data docs logs
+          
           echo "✅ 目录结构创建完成"
+          echo "📋 目录列表:"
+          ls -la | grep '^d'
       
-      # 6. 设置运行时环境变量
+      # 7. 设置运行时环境变量
       - name: ⚙️ 配置运行环境
         run: |
           # 确定获取模式
@@ -134,62 +194,111 @@ jobs:
             echo "📊 自定义最大仓库数量: ${{ github.event.inputs.max_repositories }}"
           fi
           
-          # 设置其他环境变量
+          # 设置其他环境变量（使用掩码保护敏感信息）
           echo "GH_PAT=${{ secrets.GH_PAT }}" >> $GITHUB_ENV
           echo "GITHUB_USERNAME=${{ github.actor }}" >> $GITHUB_ENV
-          echo "AI_API_KEY=${{ secrets.AI_API_KEY }}" >> $GITHUB_ENV
-          echo "AI_ACCOUNT_ID=${{ secrets.AI_ACCOUNT_ID }}" >> $GITHUB_ENV
+          
+          # 只在需要时设置AI相关环境变量
+          if [ "${{ github.event.inputs.skip_classification }}" != "true" ]; then
+            echo "AI_API_KEY=${{ secrets.AI_API_KEY }}" >> $GITHUB_ENV
+            echo "AI_ACCOUNT_ID=${{ secrets.AI_ACCOUNT_ID }}" >> $GITHUB_ENV
+          fi
+          
+          # 设置安全相关环境变量
+          echo "PYTHONUNBUFFERED=1" >> $GITHUB_ENV  # 确保Python输出不被缓冲
+          echo "PYTHONDONTWRITEBYTECODE=1" >> $GITHUB_ENV  # 不生成.pyc文件
           
           echo "✅ 环境变量配置完成"
       
-      # 7. 获取Star项目数据
+      # 8. 获取Star项目数据
       - name: ⭐ 获取GitHub Star项目
+        timeout-minutes: 30
         run: |
           echo "🚀 开始获取GitHub Star项目..."
           echo "📋 获取模式: $FETCH_MODE"
           
-          python src/fetch_stars.py
+          # 添加重试机制
+          retry_count=0
+          max_retries=3
           
-          if [ $? -eq 0 ]; then
-            echo "✅ Star项目获取成功"
-            
-            # 显示获取统计
-            if [ -f "data/stars_data.json" ]; then
-              total_count=$(python -c "import json; data=json.load(open('data/stars_data.json')); print(len(data.get('repositories', [])))")
-              echo "📊 当前总项目数: $total_count"
+          while [ $retry_count -lt $max_retries ]; do
+            if python src/fetch_stars.py; then
+              echo "✅ Star项目获取成功"
+              
+              # 显示获取统计
+              if [ -f "data/stars_data.json" ]; then
+                total_count=$(python -c "import json; data=json.load(open('data/stars_data.json')); print(len(data.get('repositories', [])))") 
+                echo "📊 当前总项目数: $total_count"
+              fi
+              break
+            else
+              retry_count=$((retry_count + 1))
+              if [ $retry_count -lt $max_retries ]; then
+                echo "⚠️ 获取失败，等待30秒后重试 ($retry_count/$max_retries)..."
+                sleep 30
+              else
+                echo "❌ Star项目获取失败，已达到最大重试次数"
+                exit 1
+              fi
             fi
-          else
-            echo "❌ Star项目获取失败"
-            exit 1
-          fi
+          done
       
-      # 8. AI分类处理
+      # 9. AI分类处理
       - name: 🤖 AI智能分类
         if: github.event.inputs.skip_classification != 'true'
+        timeout-minutes: 45
         run: |
           echo "🧠 开始AI智能分类..."
           
-          python src/classify.py
-          
-          if [ $? -eq 0 ]; then
-            echo "✅ AI分类完成"
-            
-            # 显示分类统计
-            if [ -f "data/stars_data.json" ]; then
-              python -c "
-import json
-data = json.load(open('data/stars_data.json'))
-repos = data.get('repositories', [])
-classified = sum(1 for r in repos if r.get('is_classified', False))
-print(f'📊 已分类项目: {classified}/{len(repos)}')
-"
-            fi
-          else
-            echo "❌ AI分类失败"
-            exit 1
-          fi
+          # 检查是否有需要分类的项目
+          if [ -f "data/stars_data.json" ]; then
+            unclassified_count=$(python -c "
+          import json
+          data = json.load(open('data/stars_data.json'))
+          repos = data.get('repositories', [])
+          unclassified = sum(1 for r in repos if not r.get('is_classified', False))
+          print(unclassified)
+          ")
+                      
+                      if [ "$unclassified_count" -eq "0" ]; then
+                        echo "📝 所有项目已分类，跳过AI分类步骤"
+                      else
+                        echo "📊 发现 $unclassified_count 个未分类项目，开始AI分类..."
+                        
+                        # 添加重试机制
+                        retry_count=0
+                        max_retries=2
+                        
+                        while [ $retry_count -lt $max_retries ]; do
+                          if python src/classify.py; then
+                            echo "✅ AI分类完成"
+                            
+                            # 显示分类统计
+                            python -c "
+          import json
+          data = json.load(open('data/stars_data.json'))
+          repos = data.get('repositories', [])
+          classified = sum(1 for r in repos if r.get('is_classified', False))
+          print(f'📊 已分类项目: {classified}/{len(repos)}')
+          "
+                            break
+                          else
+                            retry_count=$((retry_count + 1))
+                            if [ $retry_count -lt $max_retries ]; then
+                              echo "⚠️ AI分类失败，等待60秒后重试 ($retry_count/$max_retries)..."
+                              sleep 60
+                            else
+                              echo "❌ AI分类失败，已达到最大重试次数"
+                              exit 1
+                            fi
+                          fi
+                        done
+                      fi
+                    else
+                      echo "❌ 数据文件不存在，跳过AI分类"
+                    fi
       
-      # 9. 生成分类文档
+      # 10. 生成分类文档
       - name: 📝 生成分类文档
         run: |
           echo "📚 开始生成分类文档..."
@@ -211,7 +320,7 @@ print(f'📊 已分类项目: {classified}/{len(repos)}')
             exit 1
           fi
       
-      # 10. 更新README
+      # 11. 更新README
       - name: 📖 更新README文件
         run: |
           echo "📝 开始更新README..."
@@ -225,7 +334,7 @@ print(f'📊 已分类项目: {classified}/{len(repos)}')
             exit 1
           fi
       
-      # 11. 检查文件变更
+      # 12. 检查文件变更
       - name: 🔍 检查文件变更
         id: check_changes
         run: |
@@ -244,7 +353,7 @@ print(f'📊 已分类项目: {classified}/{len(repos)}')
             git diff --cached --name-only
           fi
       
-      # 12. 提交变更
+      # 13. 提交变更
       - name: 💾 提交变更
         if: steps.check_changes.outputs.has_changes == 'true'
         run: |
@@ -254,10 +363,16 @@ print(f'📊 已分类项目: {classified}/{len(repos)}')
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           
-          # 添加变更的文件
+          # 添加变更的文件（更精确的文件选择）
           git add data/ docs/ README.md
           
-          # 生成提交信息
+          # 检查是否有文件被添加
+          if git diff --cached --quiet; then
+            echo "⚠️ 没有文件被添加到暂存区"
+            exit 0
+          fi
+          
+          # 生成详细的提交信息
           commit_msg="🤖 自动更新GitHub Star项目数据"
           
           if [ "$FETCH_MODE" = "full" ]; then
@@ -266,9 +381,22 @@ print(f'📊 已分类项目: {classified}/{len(repos)}')
             commit_msg="$commit_msg (增量更新)"
           fi
           
-          commit_msg="$commit_msg\n\n- 获取模式: $FETCH_MODE"
+          # 获取统计信息
+          if [ -f "data/stars_data.json" ]; then
+            stats=$(python -c "
+          import json
+          data = json.load(open('data/stars_data.json'))
+          repos = data.get('repositories', [])
+          classified = sum(1 for r in repos if r.get('is_classified', False))
+          print(f'{len(repos)} 个项目，{classified} 个已分类')
+          ")
+                      commit_msg="$commit_msg\n\n📊 统计信息: $stats"
+                    fi
+          
+          commit_msg="$commit_msg\n- 获取模式: $FETCH_MODE"
           commit_msg="$commit_msg\n- 更新时间: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
           commit_msg="$commit_msg\n- 触发方式: ${{ github.event_name }}"
+          commit_msg="$commit_msg\n- 工作流运行: ${{ github.run_number }}"
           
           if [ "${{ github.event.inputs.skip_classification }}" = "true" ]; then
             commit_msg="$commit_msg\n- 跳过AI分类: 是"
@@ -279,7 +407,7 @@ print(f'📊 已分类项目: {classified}/{len(repos)}')
           
           echo "✅ 变更提交成功"
       
-      # 13. 推送变更
+      # 14. 推送变更
       - name: 🚀 推送变更
         if: steps.check_changes.outputs.has_changes == 'true'
         run: |
@@ -294,14 +422,17 @@ print(f'📊 已分类项目: {classified}/{len(repos)}')
             exit 1
           fi
       
-      # 14. 生成执行摘要
+      # 15. 生成执行摘要
       - name: 📊 生成执行摘要
         if: always()
         run: |
           echo "📊 ===== 执行摘要 ====="
-          echo "🕐 执行时间: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          echo "🕐 开始时间: ${{ github.event.created_at }}"
+          echo "🕐 结束时间: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
           echo "🔧 获取模式: $FETCH_MODE"
           echo "🎯 触发方式: ${{ github.event_name }}"
+          echo "🏃 运行编号: ${{ github.run_number }}"
+          echo "🔗 工作流链接: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           
           if [ "${{ github.event.inputs.skip_classification }}" = "true" ]; then
             echo "🤖 AI分类: 跳过"
@@ -309,52 +440,114 @@ print(f'📊 已分类项目: {classified}/{len(repos)}')
             echo "🤖 AI分类: 执行"
           fi
           
+          # 详细的数据统计
           if [ -f "data/stars_data.json" ]; then
             echo "📈 数据统计:"
             python -c "
 import json
+import os
+from datetime import datetime
 try:
     data = json.load(open('data/stars_data.json'))
     repos = data.get('repositories', [])
     classified = sum(1 for r in repos if r.get('is_classified', False))
+    
     print(f'  - 总项目数: {len(repos)}')
     print(f'  - 已分类: {classified}')
     print(f'  - 未分类: {len(repos) - classified}')
     if len(repos) > 0:
         print(f'  - 分类率: {classified/len(repos)*100:.1f}%')
+    
+    # 文件大小
+    file_size = os.path.getsize('data/stars_data.json')
+    print(f'  - 数据文件大小: {file_size/1024:.1f} KB')
+    
+    # 最后更新时间
+    last_update = data.get('metadata', {}).get('last_updated', 'Unknown')
+    print(f'  - 最后更新: {last_update}')
+    
 except Exception as e:
     print(f'  - 统计获取失败: {e}')
 "
+          else
+            echo "  - ⚠️ 数据文件不存在"
           fi
           
+          # 文档统计
           if [ -d "docs" ]; then
             doc_count=$(find docs -name "*.md" -type f | wc -l)
             echo "📚 生成文档: $doc_count 个"
+            
+            # 显示文档列表
+            if [ $doc_count -gt 0 ]; then
+              echo "📋 文档列表:"
+              find docs -name "*.md" -type f -exec basename {} \; | sort | sed 's/^/  - /'
+            fi
+          else
+            echo "📚 生成文档: 0 个"
           fi
           
           echo "📝 文件变更: ${{ steps.check_changes.outputs.has_changes }}"
+          
+          # 性能统计
+          echo "⚡ 性能统计:"
+          echo "  - 磁盘使用: $(df -h . | tail -1 | awk '{print $5}') (已用)"
+          echo "  - 内存使用: $(free -h | grep '^Mem:' | awk '{print $3"/"$2}') (已用/总计)"
+          
           echo "========================"
       
-      # 15. 错误处理和清理
+      # 16. 错误处理和清理
       - name: 🧹 清理和错误处理
         if: failure()
         run: |
-          echo "❌ 工作流执行失败，开始清理..."
+          echo "❌ 工作流执行失败，开始诊断和清理..."
+          
+          # 显示失败的步骤信息
+          echo "🔍 失败诊断:"
+          echo "  - 失败时间: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          echo "  - 运行编号: ${{ github.run_number }}"
+          echo "  - 触发方式: ${{ github.event_name }}"
           
           # 显示错误日志
           if [ -d "logs" ]; then
-            echo "📋 错误日志:"
-            find logs -name "*.log" -type f -exec echo "=== {} ===" \; -exec cat {} \;
+            echo "📋 应用错误日志:"
+            find logs -name "*.log" -type f -exec echo "=== {} ===" \; -exec head -50 {} \;
+          else
+            echo "📋 没有找到应用日志目录"
           fi
           
-          # 显示Python错误信息
+          # 检查数据文件状态
+          echo "📊 数据文件状态:"
+          if [ -f "data/stars_data.json" ]; then
+            echo "  - stars_data.json: 存在 ($(stat -c%s data/stars_data.json 2>/dev/null || stat -f%z data/stars_data.json) bytes)"
+          else
+            echo "  - stars_data.json: 不存在"
+          fi
+          
+          # 检查网络连接
+          echo "🌐 网络连接测试:"
+          if curl -s --max-time 10 https://api.github.com > /dev/null; then
+            echo "  - GitHub API: ✅ 可访问"
+          else
+            echo "  - GitHub API: ❌ 无法访问"
+          fi
+          
+          # 显示Python环境信息
           echo "🐍 Python环境信息:"
           python --version
-          pip list
+          echo "  - 已安装包:"
+          pip list | head -20
           
-          # 显示系统信息
-          echo "💻 系统信息:"
-          uname -a
-          df -h
+          # 显示系统资源信息
+          echo "💻 系统资源信息:"
+          echo "  - 系统: $(uname -s) $(uname -r)"
+          echo "  - 磁盘空间: $(df -h . | tail -1 | awk '{print $4}') 可用"
+          echo "  - 内存: $(free -h | grep '^Mem:' | awk '{print $7}') 可用"
+          
+          # 清理临时文件
+          echo "🧹 清理临时文件..."
+          find . -name "*.tmp" -type f -delete 2>/dev/null || true
+          find . -name "*.pyc" -type f -delete 2>/dev/null || true
+          find . -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
           
           echo "🧹 清理完成"
