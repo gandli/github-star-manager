@@ -17,15 +17,6 @@ on:
         options:
           - incremental
           - full
-      force_full_fetch:
-        description: '强制全量获取（忽略fetch_mode设置）'
-        required: false
-        default: false
-        type: boolean
-      max_repositories:
-        description: '最大获取仓库数量（可选，留空使用配置文件默认值）'
-        required: false
-        type: string
       skip_classification:
         description: '跳过AI分类步骤'
         required: false
@@ -34,20 +25,24 @@ on:
 
 # 环境变量
 env:
-  PYTHON_VERSION: '3.11'  # 升级到更新的Python版本以获得更好的性能
-  REQUIREMENTS_FILE: 'requirements.txt'
-  PIP_CACHE_DIR: ~/.cache/pip  # 设置pip缓存目录
+  PYTHON_VERSION: '3.11'
+  PYTHONUNBUFFERED: 1
+  PYTHONDONTWRITEBYTECODE: 1
+  # GitHub相关环境变量
+  GH_PAT: ${{ secrets.GH_PAT }}
+  GITHUB_USERNAME: ${{ github.actor }}
+  # AI相关环境变量（仅在需要时使用）
+  AI_API_KEY: ${{ secrets.AI_API_KEY }}
+  AI_ACCOUNT_ID: ${{ secrets.AI_ACCOUNT_ID }}
 
 # 作业定义
 jobs:
   update-stars:
     name: 更新GitHub Star项目
     runs-on: ubuntu-latest
-    
-    # 超时设置（防止工作流无限运行）
     timeout-minutes: 60
     
-    # 并发控制（确保同一时间只有一个实例运行）
+    # 并发控制
     concurrency:
       group: update-stars-${{ github.ref }}
       cancel-in-progress: false
@@ -63,7 +58,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          fetch-depth: 1  # 浅克隆以提高性能，除非需要完整历史记录
+          fetch-depth: 1
           persist-credentials: true
       
       # 2. 设置Python环境
@@ -72,33 +67,21 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: 'pip'
-          cache-dependency-path: ${{ env.REQUIREMENTS_FILE }}
+          cache-dependency-path: 'requirements.txt'
       
       # 3. 安装依赖
       - name: 📦 安装Python依赖
         run: |
-          python -m pip install --upgrade pip setuptools wheel
-          if [ -f ${{ env.REQUIREMENTS_FILE }} ]; then
-            pip install -r ${{ env.REQUIREMENTS_FILE }} --no-warn-script-location
-          else
-            echo "⚠️ requirements.txt not found, installing basic dependencies"
-            pip install requests PyYAML --no-warn-script-location
-          fi
-          
-          # 验证关键依赖是否安装成功
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
           python -c "import requests, yaml; print('✅ 核心依赖验证通过')"
       
-      # 4. 验证环境变量
+      # 4. 验证环境配置
       - name: 🔍 验证环境配置
         run: |
           python src/env_check.py --secrets-only ${{ github.event.inputs.skip_classification == 'true' && '--skip-classification' || '' }}
       
-      # 5. 健康检查
-      - name: 🏥 系统健康检查
-        run: |
-          python src/env_check.py --health-check ${{ github.event.inputs.skip_classification == 'true' && '--skip-classification' || '' }}
-      
-      # 6. 创建必要的目录
+      # 5. 创建必要的目录
       - name: 📁 创建目录结构
         run: |
           python src/workflow_utils.py create-dirs
