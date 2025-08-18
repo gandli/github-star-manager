@@ -170,7 +170,6 @@ github-star-manager/
 | `GH_PAT` | GitHub个人访问令牌 | ✅ |
 | `AI_API_KEY` | Cloudflare Workers AI API密钥 | ✅ |
 | `AI_ACCOUNT_ID` | Cloudflare账户ID | ✅ |
-| `GITHUB_USERNAME` | GitHub用户名 | ✅ |
 | `FETCH_MODE` | 获取模式 (full/incremental) | ❌ |
 
 ### 配置文件 (config.yaml)
