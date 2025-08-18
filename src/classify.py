@@ -110,12 +110,12 @@ class AIClassifier:
 5. 必须严格按照JSON格式返回，不要添加任何额外的文本
 
 项目信息：
-名称：{{}}
-描述：{{}}
-语言：{{}}
-主题：{{}}
-星数：{{}}
-URL：{{}}
+名称：{{name}}
+描述：{{description}}
+语言：{{language}}
+主题：{{topics}}
+星数：{{stars}}
+URL：{{url}}
 """
         return prompt
     
