@@ -3,8 +3,8 @@ name: Update GitHub Stars
 on:
   # 定时运行
   schedule:
-    # 每周一凌晨3点运行
-    - cron: "0 3 * * 1"
+    # 每天凌晨3点运行
+    - cron: "0 3 * * *"
 
   # 手动触发
   workflow_dispatch:
@@ -53,13 +53,16 @@ jobs:
         env:
           AI_API_KEY: ${{ secrets.AI_API_KEY }}
 
-      - name: 更新README
-        run: python src/update_readme.py
+      - name: 生成分类文档
+        run: |
+          echo "开始生成分类文档..."
+          python src/generate_category_docs.py
+          echo "分类文档生成完成"
 
       - name: 提交更改
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git add README.md data/
-          git commit -m "自动更新Star项目列表 $(date +'%Y-%m-%d')" || echo "没有更改需要提交"
+          git add docs/ data/
+          git commit -m "自动更新Star项目分类文档 $(date +'%Y-%m-%d')" || echo "没有更改需要提交"
           git push -f

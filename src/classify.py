@@ -277,9 +277,11 @@ def main():
     ai_api_url = config.get('ai_api_url', 'https://open.bigmodel.cn/api/paas/v4/chat/completions')
     categories = config.get('categories', ['其他'])
     incremental_update = config.get('incremental_update', True)
+    max_process_count = config.get('max_stars', 50)  # 每次最多处理的项目数
     print(f"配置加载完成，使用模型: {ai_model}")
     print(f"可用分类: {', '.join(categories)}")
     print(f"增量更新模式: {incremental_update}")
+    print(f"每次最多处理项目数: {max_process_count}")
     
     # 创建输出目录
     print("正在创建输出目录...")
@@ -319,6 +321,15 @@ def main():
                     print("没有新项目需要分类，使用现有分类结果")
                     classified_repos = existing_classified_repos
                 else:
+                    # 按时间升序排序新项目（最早star的项目优先处理）
+                    new_repos.sort(key=lambda x: x.get('starred_at', ''), reverse=False)
+                    print(f"已按star时间升序排序新项目")
+                    
+                    # 限制处理数量
+                    if len(new_repos) > max_process_count:
+                        new_repos = new_repos[:max_process_count]
+                        print(f"限制处理数量为{max_process_count}个项目（按时间升序选择最早的项目）")
+                    
                     # 只对新项目进行分类
                     print(f"开始对{len(new_repos)}个新项目进行分类和摘要生成...")
                     print(f"设置请求间隔为5秒，最大并发数为2，以避免API并发限制")
@@ -339,6 +350,16 @@ def main():
     # 如果不是增量更新或增量更新失败，对所有项目进行分类
     if not incremental_update or 'classified_repos' not in locals():
         print("开始对项目进行分类和摘要生成...")
+        
+        # 按时间升序排序项目（最早star的项目优先处理）
+        repos.sort(key=lambda x: x.get('starred_at', ''), reverse=False)
+        print(f"已按star时间升序排序项目")
+        
+        # 限制处理数量
+        if len(repos) > max_process_count:
+            repos = repos[:max_process_count]
+            print(f"限制处理数量为{max_process_count}个项目（按时间升序选择最早的项目）")
+        
         print(f"设置请求间隔为5秒，最大并发数为2，以避免API并发限制")
         # 设置较长的请求间隔和最大并发数为2，避免API并发限制
         classified_repos = classify_repos(repos, ai_api_key, ai_api_url, ai_model, categories, 
