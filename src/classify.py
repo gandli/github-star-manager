@@ -40,12 +40,12 @@ def load_repos(input_file):
 
 def call_ai_api(api_key, api_url, model, prompt, max_retries=3, retry_delay=5):
     """
-    调用AI API进行项目分类和摘要生成
+    调用Cloudflare Workers AI API进行项目分类和摘要生成
     
     Args:
-        api_key: AI API密钥
+        api_key: Cloudflare Workers AI API密钥
         api_url: API地址
-        model: 模型名称
+        model: 模型名称（用于Cloudflare Workers AI）
         prompt: 提示词
         max_retries: 最大重试次数
         retry_delay: 重试间隔（秒）
@@ -60,18 +60,12 @@ def call_ai_api(api_key, api_url, model, prompt, max_retries=3, retry_delay=5):
         'Content-Type': 'application/json'
     }
     
+    # Cloudflare Workers AI API格式 - 使用input字段
+    system_prompt = "你是一个专业的GitHub项目分析助手，擅长对项目进行分类和生成摘要。"
+    full_prompt = f"{system_prompt}\n\n{prompt}"
+    
     data = {
-        "model": model,
-        "messages": [
-            {
-                "role": "system",
-                "content": "你是一个专业的GitHub项目分析助手，擅长对项目进行分类和生成摘要。"
-            },
-            {
-                "role": "user",
-                "content": prompt
-            }
-        ]
+        "input": full_prompt
     }
     
     for attempt in range(max_retries):
@@ -86,7 +80,22 @@ def call_ai_api(api_key, api_url, model, prompt, max_retries=3, retry_delay=5):
             response = requests.post(api_url, headers=headers, json=data)
             response.raise_for_status()
             result = response.json()
-            return result['choices'][0]['message']['content']
+            
+            # 处理Cloudflare Workers AI响应格式
+            if 'result' in result and 'result' in result and 'output' in result['result']:
+                # Cloudflare Workers AI格式: result.result.output[1].content[0].text
+                output = result['result']['output']
+                if len(output) > 1 and 'content' in output[1] and len(output[1]['content']) > 0:
+                    return output[1]['content'][0]['text']
+                else:
+                    print(f"Cloudflare Workers AI响应格式异常: {result}")
+                    return None
+            elif 'choices' in result:
+                # OpenAI格式（兼容性）
+                return result['choices'][0]['message']['content']
+            else:
+                print(f"未知的API响应格式: {result}")
+                return None
         except requests.exceptions.HTTPError as e:
             # 特别处理429错误（请求过多）
             if hasattr(e, 'response') and e.response.status_code == 429:
@@ -297,18 +306,32 @@ def main():
         sys.exit(1)
     print("成功获取AI API密钥")
     
+    # 获取AI账户ID
+    print("正在获取AI账户ID...")
+    ai_account_id = os.environ.get('AI_ACCOUNT_ID')
+    if not ai_account_id:
+        print("错误: 未设置AI_ACCOUNT_ID环境变量")
+        sys.exit(1)
+    print("成功获取AI账户ID")
+    
     # 加载配置
     print("正在加载配置文件...")
     config = load_config()
-    ai_model = config.get('ai_model', 'glm-4.5-flash')
-    ai_api_url = config.get('ai_api_url', 'https://open.bigmodel.cn/api/paas/v4/chat/completions')
+    ai_model = config.get('ai_model', '@cf/openai/gpt-oss-20b')
+    # 动态构建API URL
+    ai_api_url = f"https://api.cloudflare.com/client/v4/accounts/{ai_account_id}/ai/run/{ai_model}"
     categories = config.get('categories', ['其他'])
     incremental_update = config.get('incremental_update', True)
     max_process_count = config.get('max_stars', 50)  # 每次最多处理的项目数
     print(f"配置加载完成，使用模型: {ai_model}")
+    print(f"API地址: {ai_api_url}")
     print(f"可用分类: {', '.join(categories)}")
     print(f"增量更新模式: {incremental_update}")
     print(f"每次最多处理项目数: {max_process_count}")
+    
+    # 获取分类进度统计
+    stats = data_manager.get_statistics()
+    print(f"当前分类进度: 总计{stats['total_stars']}个项目，已分类{stats['classified_count']}个，未分类{stats['unclassified_count']}个")
     
     # 创建输出目录
     print("正在创建输出目录...")
@@ -326,61 +349,62 @@ def main():
     repos = load_repos(input_file)
     print(f"已加载{len(repos)}个Star项目")
     
-    # 如果是增量更新，加载现有的分类结果
-    if incremental_update:
-        existing_classified_repos = []
-        existing_repo_urls = set()
-        latest_classified_file = os.path.join(data_dir, 'classified_repos_latest.json')
-        
-        if os.path.exists(latest_classified_file):
-            try:
-                print(f"增量更新模式：正在加载现有分类结果 {latest_classified_file}")
-                with open(latest_classified_file, 'r', encoding='utf-8') as f:
-                    existing_classified_repos = json.load(f)
-                existing_repo_urls = {repo['html_url'] for repo in existing_classified_repos}
-                print(f"已加载{len(existing_classified_repos)}个现有分类项目")
-                
-                # 筛选出需要分类的新项目
-                new_repos = [repo for repo in repos if repo['html_url'] not in existing_repo_urls]
-                print(f"发现{len(new_repos)}个新项目需要分类")
-                
-                if not new_repos:
-                    print("没有新项目需要分类，使用现有分类结果")
-                    classified_repos = existing_classified_repos
-                else:
-                    # 按时间升序排序新项目（最早star的项目优先处理）
-                    # 由于GitHub API不直接提供starred_at信息，使用created_at作为替代排序字段
-                    new_repos.sort(key=lambda x: x.get('created_at', '1970-01-01T00:00:00Z'), reverse=False)
-                    print(f"已按项目创建时间升序排序新项目")
-                    
-                    # 限制处理数量
-                    if len(new_repos) > max_process_count:
-                        new_repos = new_repos[:max_process_count]
-                        print(f"限制处理数量为{max_process_count}个项目（按时间升序选择最早的项目）")
-                    
-                    # 只对新项目进行分类
-                    print(f"开始对{len(new_repos)}个新项目进行分类和摘要生成...")
-                    print(f"设置请求间隔为5秒，最大并发数为2，以避免API并发限制")
-                    new_classified_repos = classify_repos(new_repos, ai_api_key, ai_api_url, ai_model, categories, 
-                                                        request_interval=5, max_concurrent=2)
-                    print(f"新项目分类和摘要生成完成，共处理{len(new_classified_repos)}个项目")
-                    
-                    # 合并新旧分类结果
-                    classified_repos = existing_classified_repos + new_classified_repos
-                    print(f"合并分类结果：{len(existing_classified_repos)}个现有项目 + {len(new_classified_repos)}个新项目 = {len(classified_repos)}个总项目")
-            except Exception as e:
-                print(f"加载现有分类结果失败，将对所有项目重新分类: {e}")
-                incremental_update = False
-        else:
-            print("未找到现有分类结果，将对所有项目进行分类")
-            incremental_update = False
+    # 确保所有项目都已添加到数据管理器中
+    print("正在同步项目数据到数据管理器...")
+    for repo in repos:
+        data_manager.add_or_update_star(repo)
+    print("项目数据同步完成")
     
-    # 如果不是增量更新或增量更新失败，对所有项目进行分类
-    if not incremental_update or 'classified_repos' not in locals():
-        print("开始对项目进行分类和摘要生成...")
+    # 如果是增量更新，只处理未分类的项目
+    if incremental_update:
+        print("增量更新模式：正在获取未分类的项目...")
         
-        # 按时间升序排序项目（最早star的项目优先处理）
-        # 由于GitHub API不直接提供starred_at信息，使用created_at作为替代排序字段
+        # 获取未分类的项目
+        unclassified_stars = data_manager.get_unclassified_stars()
+        print(f"发现{len(unclassified_stars)}个未分类项目")
+        
+        if not unclassified_stars:
+            print("没有未分类项目，跳过AI分类步骤")
+            # 获取所有已分类项目用于生成文档
+            classified_stars = data_manager.get_classified_stars()
+            classified_repos = []
+            for star_id, star_data in classified_stars.items():
+                classified_repos.append(star_data)
+            print(f"使用现有{len(classified_repos)}个已分类项目生成文档")
+        else:
+            # 将未分类的star数据转换为repos格式
+            unclassified_repos = []
+            for star_id, star_data in unclassified_stars.items():
+                unclassified_repos.append(star_data)
+            
+            # 按时间升序排序未分类项目（最早添加的项目优先处理）
+            unclassified_repos.sort(key=lambda x: x.get('added_date', '1970-01-01T00:00:00Z'), reverse=False)
+            print(f"已按项目添加时间升序排序未分类项目")
+            
+            # 限制处理数量
+            if len(unclassified_repos) > max_process_count:
+                unclassified_repos = unclassified_repos[:max_process_count]
+                print(f"限制处理数量为{max_process_count}个项目（按时间升序选择最早的项目）")
+            
+            # 只对未分类项目进行分类
+            print(f"开始对{len(unclassified_repos)}个未分类项目进行AI分类和摘要生成...")
+            print(f"设置请求间隔为5秒，最大并发数为2，以避免API并发限制")
+            new_classified_repos = classify_repos(unclassified_repos, ai_api_key, ai_api_url, ai_model, categories, 
+                                                request_interval=5, max_concurrent=2)
+            print(f"未分类项目AI分类完成，共处理{len(new_classified_repos)}个项目")
+            
+            # 获取所有已分类项目（包括新分类的）
+            all_classified_stars = data_manager.get_classified_stars()
+            classified_repos = []
+            for star_id, star_data in all_classified_stars.items():
+                classified_repos.append(star_data)
+            print(f"总计{len(classified_repos)}个已分类项目将用于生成文档")
+    
+    # 如果不是增量更新，对所有项目进行分类
+    if not incremental_update or 'classified_repos' not in locals():
+        print("全量更新模式：开始对所有项目进行分类和摘要生成...")
+        
+        # 按时间升序排序项目（最早添加的项目优先处理）
         repos.sort(key=lambda x: x.get('created_at', '1970-01-01T00:00:00Z'), reverse=False)
         print(f"已按项目创建时间升序排序项目")
         
@@ -391,9 +415,16 @@ def main():
         
         print(f"设置请求间隔为5秒，最大并发数为2，以避免API并发限制")
         # 设置较长的请求间隔和最大并发数为2，避免API并发限制
-        classified_repos = classify_repos(repos, ai_api_key, ai_api_url, ai_model, categories, 
+        new_classified_repos = classify_repos(repos, ai_api_key, ai_api_url, ai_model, categories, 
                                         request_interval=5, max_concurrent=2)
-        print(f"项目分类和摘要生成完成，共处理{len(classified_repos)}个项目")
+        print(f"项目分类和摘要生成完成，共处理{len(new_classified_repos)}个项目")
+        
+        # 获取所有已分类项目
+        all_classified_stars = data_manager.get_classified_stars()
+        classified_repos = []
+        for star_id, star_data in all_classified_stars.items():
+            classified_repos.append(star_data)
+        print(f"总计{len(classified_repos)}个已分类项目将用于生成文档")
     
     # 保存结果
     print("正在保存分类结果...")
