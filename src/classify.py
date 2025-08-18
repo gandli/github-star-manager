@@ -11,6 +11,7 @@ import json
 import yaml
 import requests
 from datetime import datetime
+from data_manager import data_manager
 
 
 def load_config():
@@ -184,17 +185,43 @@ def process_repo(repo, api_key, api_url, model, categories, request_interval=3):
         
         # 添加分类和摘要到项目信息中
         repo_with_analysis = repo.copy()
-        repo_with_analysis['category'] = result.get('category', '其他')
+        category = result.get('category', '其他')
+        repo_with_analysis['category'] = category
         repo_with_analysis['summary'] = result.get('summary', '无摘要')
         repo_with_analysis['key_features'] = result.get('key_features', ['无特点'])
+        
+        # 更新数据管理器中的分类信息
+        try:
+            confidence = result.get('confidence', 0.8)  # 默认置信度
+            reason = f"AI分类结果: {result.get('summary', '无摘要')}"
+            data_manager.update_classification(
+                repo['full_name'], 
+                category, 
+                confidence, 
+                reason
+            )
+        except Exception as e:
+            print(f"更新数据管理器失败: {repo['full_name']} - {e}")
         
         print(f"成功处理: {repo['full_name']}")
     else:
         # 如果AI调用失败，使用默认值
         repo_with_analysis = repo.copy()
-        repo_with_analysis['category'] = '其他'
+        category = '其他'
+        repo_with_analysis['category'] = category
         repo_with_analysis['summary'] = '无法生成摘要'
         repo_with_analysis['key_features'] = ['无法识别特点']
+        
+        # 更新数据管理器中的分类信息（失败情况）
+        try:
+            data_manager.update_classification(
+                repo['full_name'], 
+                category, 
+                0.1,  # 低置信度
+                "AI分类失败，使用默认分类"
+            )
+        except Exception as e:
+            print(f"更新数据管理器失败: {repo['full_name']} - {e}")
         
         print(f"处理失败: {repo['full_name']}，使用默认值")
     
@@ -322,8 +349,9 @@ def main():
                     classified_repos = existing_classified_repos
                 else:
                     # 按时间升序排序新项目（最早star的项目优先处理）
-                    new_repos.sort(key=lambda x: x.get('starred_at', ''), reverse=False)
-                    print(f"已按star时间升序排序新项目")
+                    # 由于GitHub API不直接提供starred_at信息，使用created_at作为替代排序字段
+                    new_repos.sort(key=lambda x: x.get('created_at', '1970-01-01T00:00:00Z'), reverse=False)
+                    print(f"已按项目创建时间升序排序新项目")
                     
                     # 限制处理数量
                     if len(new_repos) > max_process_count:
@@ -352,8 +380,9 @@ def main():
         print("开始对项目进行分类和摘要生成...")
         
         # 按时间升序排序项目（最早star的项目优先处理）
-        repos.sort(key=lambda x: x.get('starred_at', ''), reverse=False)
-        print(f"已按star时间升序排序项目")
+        # 由于GitHub API不直接提供starred_at信息，使用created_at作为替代排序字段
+        repos.sort(key=lambda x: x.get('created_at', '1970-01-01T00:00:00Z'), reverse=False)
+        print(f"已按项目创建时间升序排序项目")
         
         # 限制处理数量
         if len(repos) > max_process_count:
@@ -375,6 +404,13 @@ def main():
     # 同时保存一个最新版本
     latest_file = os.path.join(data_dir, 'classified_repos_latest.json')
     save_classified_repos(classified_repos, latest_file)
+    
+    # 保存数据管理器的数据
+    try:
+        data_manager.save_data()
+        print("数据管理器数据保存成功")
+    except Exception as e:
+        print(f"保存数据管理器数据失败: {e}")
     
     print("========== 项目分类和摘要生成脚本执行完成 ==========")
 

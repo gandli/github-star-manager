@@ -11,6 +11,7 @@ import yaml
 import json
 import requests
 from datetime import datetime
+from data_manager import data_manager
 
 
 def load_config():
@@ -281,6 +282,22 @@ def main():
     # 同时保存一个最新版本
     latest_file = os.path.join(data_dir, 'starred_repos_latest.json')
     save_repos_to_file(repos, latest_file)
+    
+    # 将项目数据保存到JSON数据管理器中
+    print("正在将项目数据保存到数据管理器...")
+    for repo in repos:
+        try:
+            data_manager.add_or_update_star(repo)
+        except Exception as e:
+            print(f"保存项目 {repo.get('full_name', 'unknown')} 到数据管理器失败: {e}")
+    
+    # 显示统计信息
+    stats = data_manager.get_statistics()
+    print(f"数据管理器统计信息:")
+    print(f"  总项目数: {stats.get('total_stars', 0)}")
+    print(f"  已分类项目数: {stats.get('classified_count', 0)}")
+    print(f"  未分类项目数: {stats.get('unclassified_count', 0)}")
+    print(f"  最后更新时间: {stats.get('last_updated', 'unknown')}")
     
     print("========== 获取GitHub Star项目列表脚本执行完成 ==========")
 
