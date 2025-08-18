@@ -301,12 +301,12 @@ URL：{{url}}
         
         # 格式化提示词
         prompt = self.classification_prompt.format(
-            project_info['name'],
-            project_info['description'],
-            project_info['language'],
-            project_info['topics'],
-            project_info['stars'],
-            project_info['url']
+            name=project_info['name'],
+            description=project_info['description'],
+            language=project_info['language'],
+            topics=project_info['topics'],
+            stars=project_info['stars'],
+            url=project_info['url']
         )
         
         # 发送AI请求
