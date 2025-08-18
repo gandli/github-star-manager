@@ -65,17 +65,21 @@ class StarDataManager:
                 "stars": {}
             }
     
-    def save_data(self, data: Dict[str, Any]):
+    def save_data(self, data: Optional[Dict[str, Any]] = None):
         """
         保存数据到JSON文件
         
         Args:
-            data: 要保存的数据字典
+            data: 要保存的数据字典，如果为None则保存当前加载的数据
         """
         try:
-            # 更新元数据
-            data["metadata"]["last_updated"] = datetime.now().isoformat()
+            if data is None:
+                data = self.load_data()
             
+            # 更新元数据
+            self.update_metadata(data)
+            
+            os.makedirs(os.path.dirname(self.data_file_path), exist_ok=True)
             with open(self.data_file_path, 'w', encoding='utf-8') as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
             logger.info(f"数据已保存到 {self.data_file_path}")
