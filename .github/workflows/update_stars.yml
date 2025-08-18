@@ -257,162 +257,28 @@ jobs:
         id: check_changes
         run: |
           echo "🔍 检查文件变更..."
-          
-          # 检查是否有变更
-          if git diff --quiet && git diff --cached --quiet; then
-            echo "📝 没有检测到文件变更"
-            echo "has_changes=false" >> $GITHUB_OUTPUT
-          else
-            echo "📝 检测到文件变更"
-            echo "has_changes=true" >> $GITHUB_OUTPUT
-            
-            echo "📋 变更的文件:"
-            git diff --name-only
-            git diff --cached --name-only
-          fi
+          python src/workflow_utils.py check-changes
       
       # 13. 提交变更
       - name: 💾 提交变更
         if: steps.check_changes.outputs.has_changes == 'true'
         run: |
           echo "💾 提交文件变更..."
-          
-          # 配置Git用户信息
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          
-          # 添加变更的文件（更精确的文件选择）
-          git add data/ docs/ README.md
-          
-          # 检查是否有文件被添加
-          if git diff --cached --quiet; then
-            echo "⚠️ 没有文件被添加到暂存区"
-            exit 0
-          fi
-          
-          # 生成详细的提交信息
-          commit_msg="🤖 自动更新GitHub Star项目数据"
-          
-          if [ "$FETCH_MODE" = "full" ]; then
-            commit_msg="$commit_msg (全量更新)"
-          else
-            commit_msg="$commit_msg (增量更新)"
-          fi
-          
-          # 获取统计信息
-          if [ -f "data/stars_data.json" ]; then
-            stats=$(python -c "
-          import json
-          data = json.load(open('data/stars_data.json'))
-          repos = data.get('repositories', [])
-          classified = sum(1 for r in repos if r.get('is_classified', False))
-          print(f'{len(repos)} 个项目，{classified} 个已分类')
-          ")
-                      commit_msg="$commit_msg\n\n📊 统计信息: $stats"
-                    fi
-          
-          commit_msg="$commit_msg\n- 获取模式: $FETCH_MODE"
-          commit_msg="$commit_msg\n- 更新时间: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
-          commit_msg="$commit_msg\n- 触发方式: ${{ github.event_name }}"
-          commit_msg="$commit_msg\n- 工作流运行: ${{ github.run_number }}"
-          
-          if [ "${{ github.event.inputs.skip_classification }}" = "true" ]; then
-            commit_msg="$commit_msg\n- 跳过AI分类: 是"
-          fi
-          
-          # 提交变更
-          git commit -m "$commit_msg"
-          
-          echo "✅ 变更提交成功"
+          python src/workflow_utils.py commit-changes "$FETCH_MODE" "${{ github.event_name }}" "${{ github.run_number }}" "${{ github.event.inputs.skip_classification }}"
       
       # 14. 推送变更
       - name: 🚀 推送变更
         if: steps.check_changes.outputs.has_changes == 'true'
         run: |
           echo "🚀 推送变更到远程仓库..."
-          
-          git push
-          
-          if [ $? -eq 0 ]; then
-            echo "✅ 变更推送成功"
-          else
-            echo "❌ 变更推送失败"
-            exit 1
-          fi
+          python src/workflow_utils.py push-changes
       
       # 15. 生成执行摘要
       - name: 📊 生成执行摘要
         if: always()
         run: |
-          echo "📊 ===== 执行摘要 ====="
-          echo "🕐 开始时间: ${{ github.event.created_at }}"
-          echo "🕐 结束时间: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
-          echo "🔧 获取模式: $FETCH_MODE"
-          echo "🎯 触发方式: ${{ github.event_name }}"
-          echo "🏃 运行编号: ${{ github.run_number }}"
-          echo "🔗 工作流链接: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          
-          if [ "${{ github.event.inputs.skip_classification }}" = "true" ]; then
-            echo "🤖 AI分类: 跳过"
-          else
-            echo "🤖 AI分类: 执行"
-          fi
-          
-          # 详细的数据统计
-          if [ -f "data/stars_data.json" ]; then
-            echo "📈 数据统计:"
-            python -c "
-import json
-import os
-from datetime import datetime
-try:
-    data = json.load(open('data/stars_data.json'))
-    repos = data.get('repositories', [])
-    classified = sum(1 for r in repos if r.get('is_classified', False))
-    
-    print(f'  - 总项目数: {len(repos)}')
-    print(f'  - 已分类: {classified}')
-    print(f'  - 未分类: {len(repos) - classified}')
-    if len(repos) > 0:
-        print(f'  - 分类率: {classified/len(repos)*100:.1f}%')
-    
-    # 文件大小
-    file_size = os.path.getsize('data/stars_data.json')
-    print(f'  - 数据文件大小: {file_size/1024:.1f} KB')
-    
-    # 最后更新时间
-    last_update = data.get('metadata', {}).get('last_updated', 'Unknown')
-    print(f'  - 最后更新: {last_update}')
-    
-except Exception as e:
-    print(f'  - 统计获取失败: {e}')
-"
-          else
-            echo "  - ⚠️ 数据文件不存在"
-          fi
-          
-          # 文档统计
-          if [ -d "docs" ]; then
-            doc_count=$(find docs -name "*.md" -type f | wc -l)
-            echo "📚 生成文档: $doc_count 个"
-            
-            # 显示文档列表
-            if [ $doc_count -gt 0 ]; then
-              echo "📋 文档列表:"
-              find docs -name "*.md" -type f -exec basename {} \; | sort | sed 's/^/  - /'
-            fi
-          else
-            echo "📚 生成文档: 0 个"
-          fi
-          
-          echo "📝 文件变更: ${{ steps.check_changes.outputs.has_changes }}"
-          
-          # 性能统计
-          echo "⚡ 性能统计:"
-          echo "  - 磁盘使用: $(df -h . | tail -1 | awk '{print $5}') (已用)"
-          echo "  - 内存使用: $(free -h | grep '^Mem:' | awk '{print $3"/"$2}') (已用/总计)"
-          
-          echo "========================"
+          echo "📊 生成执行摘要..."
+          python src/workflow_utils.py summary "${{ github.event.created_at }}" "$FETCH_MODE" "${{ github.event_name }}" "${{ github.run_number }}" "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" "${{ github.event.inputs.skip_classification }}" "${{ steps.check_changes.outputs.has_changes }}"
       
       # 16. 错误处理和清理
       - name: 🧹 清理和错误处理
