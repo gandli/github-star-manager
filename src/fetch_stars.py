@@ -185,9 +185,26 @@ def main():
     print("正在加载配置文件...")
     # 加载配置
     config = load_config()
-    max_stars = config.get('max_stars', 100)
-    # 默认使用增量更新模式
-    incremental_update = config.get('incremental_update', True)
+    
+    # 检查环境变量FETCH_MODE，优先级高于配置文件
+    fetch_mode = os.environ.get('FETCH_MODE', '').lower()
+    if fetch_mode == 'full':
+        incremental_update = False
+        max_stars = config.get('max_stars', 1000)  # 全量模式使用更大的数量
+        print("环境变量指定使用全量模式")
+    elif fetch_mode == 'incremental':
+        incremental_update = True
+        max_stars = config.get('incremental_max_stars', 100)  # 增量模式使用较小的数量
+        print("环境变量指定使用增量模式")
+    else:
+        # 默认使用增量更新模式
+        incremental_update = config.get('incremental_update', True)
+        if incremental_update:
+            max_stars = config.get('incremental_max_stars', 100)
+        else:
+            max_stars = config.get('max_stars', 1000)
+        print("使用配置文件中的模式设置")
+    
     print(f"配置加载完成，最大获取Star数量: {max_stars}，增量更新模式: {incremental_update}")
     
     print("正在获取GitHub用户名...")

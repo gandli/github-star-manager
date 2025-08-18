@@ -7,7 +7,21 @@ on:
     - cron: '0 3 * * *'
 
   # 手动触发
-  workflow_dispatch: {}  # 允许手动触发
+  workflow_dispatch:
+    inputs:
+      fetch_mode:
+        description: '获取模式选择'
+        required: true
+        default: 'incremental'
+        type: choice
+        options:
+          - incremental
+          - full
+      force_full_fetch:
+        description: '强制全量获取所有星标项目（忽略增量更新）'
+        required: false
+        default: false
+        type: boolean
 
   # 当配置文件更改时运行
   # push:
@@ -45,7 +59,14 @@ jobs:
 
       - name: 获取Star项目列表
         run: |
-          echo "开始获取Star项目列表（增量更新模式）..."
+          # 确定获取模式
+          if [ "${{ github.event.inputs.fetch_mode }}" = "full" ] || [ "${{ github.event.inputs.force_full_fetch }}" = "true" ] || [ "${{ github.event_name }}" = "schedule" -a ! -f "data/starred_repos_latest.json" ]; then
+            echo "开始获取Star项目列表（全量模式）..."
+            export FETCH_MODE="full"
+          else
+            echo "开始获取Star项目列表（增量模式）..."
+            export FETCH_MODE="incremental"
+          fi
           python src/fetch_stars.py
           echo "Star项目列表获取完成"
         env:

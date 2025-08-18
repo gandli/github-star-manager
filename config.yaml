@@ -2,8 +2,9 @@
 
 # 基本配置
 update_interval: 1    # 更新频率（天）
-max_stars: 3         # 最大获取的Star项目数量
+max_stars: 1000      # 最大获取的Star项目数量（全量模式时使用）
 incremental_update: true  # 是否使用增量更新模式（只获取最新的Star项目）
+incremental_max_stars: 100  # 增量更新时最大获取数量
 max_items_per_doc: 50    # 每个分类文档最大项目数
 
 # 网络请求配置
