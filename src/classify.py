@@ -205,6 +205,45 @@ URL：{{}}
             except json.JSONDecodeError:
                 continue
         
+        # 尝试修复不完整的JSON格式
+        # 处理类似 '\n  "category": "Web开发"\n  "summary": "测试"' 的情况
+        try:
+            # 移除前后空白字符
+            cleaned_text = response_text.strip()
+            
+            # 如果不是以{开头，尝试添加花括号
+            if not cleaned_text.startswith('{'):
+                # 查找所有的键值对
+                key_value_pattern = r'"([^"]+)"\s*:\s*([^\n]+)'
+                matches = re.findall(key_value_pattern, cleaned_text)
+                
+                if matches:
+                    # 构建JSON对象
+                    json_parts = []
+                    for key, value in matches:
+                        # 清理值，移除多余的引号和空白
+                        value = value.strip().rstrip(',')
+                        
+                        # 如果值不是以"开头，可能是数组或其他类型
+                        if value.startswith('[') or value.startswith('{'):
+                            json_parts.append(f'"{key}": {value}')
+                        elif value.startswith('"') and value.endswith('"'):
+                            json_parts.append(f'"{key}": {value}')
+                        else:
+                            # 假设是字符串，添加引号
+                            json_parts.append(f'"{key}": "{value}"')
+                    
+                    if json_parts:
+                        # 添加默认的key_features如果缺失
+                        has_key_features = any('key_features' in part for part in json_parts)
+                        if not has_key_features:
+                            json_parts.append('"key_features": []')
+                        
+                        json_str = '{' + ', '.join(json_parts) + '}'
+                        return json.loads(json_str)
+        except Exception as e:
+            self.logger.debug(f"Failed to repair JSON: {e}")
+        
         self.logger.warning(f"Failed to extract JSON from response: {response_text[:200]}...")
         return None
     
