@@ -132,7 +132,8 @@ def main():
     # 加载配置
     print("正在加载配置...")
     config = load_config()
-    username = config.get('GITHUB_USERNAME')
+    # username = config.get('GITHUB_USERNAME')
+    username = os.environ.get('GITHUB_USERNAME')
     print("配置加载完成")
     
     # 加载分类后的项目列表
