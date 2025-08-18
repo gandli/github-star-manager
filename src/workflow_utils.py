@@ -91,9 +91,9 @@ class WorkflowUtils:
             print(f"❌ 检查文件变更失败: {e}")
             return False, []
     
-    def commit_and_push_changes(self, fetch_mode: str, workflow_run: str, 
-                               skip_classification: bool = False) -> bool:
-        """提交并推送变更"""
+    def commit_and_push_changes(self, run_number: str, fetch_mode: str = "incremental", 
+                               event_name: str = "manual", skip_classification: str = "false") -> bool:
+        """提交并推送变更到Git仓库"""
         print("💾 提交文件变更...")
         
         try:
@@ -114,10 +114,33 @@ class WorkflowUtils:
                 print("⚠️ 没有文件被添加到暂存区")
                 return True
             
-            # 生成提交信息
-            from .stats import StatsReporter
-            reporter = StatsReporter()
-            commit_msg = reporter.generate_commit_message(fetch_mode, workflow_run, skip_classification)
+            # 生成详细的提交信息
+            commit_msg = "🤖 自动更新GitHub Star项目数据"
+            
+            if fetch_mode == "full":
+                commit_msg += " (全量更新)"
+            else:
+                commit_msg += " (增量更新)"
+            
+            # 获取统计信息
+            if os.path.exists("data/stars_data.json"):
+                try:
+                    with open("data/stars_data.json", "r", encoding="utf-8") as f:
+                        data = json.load(f)
+                    repos = data.get("repositories", [])
+                    classified = sum(1 for r in repos if r.get("is_classified", False))
+                    stats = f"{len(repos)} 个项目，{classified} 个已分类"
+                    commit_msg += f"\n\n📊 统计信息: {stats}"
+                except Exception as e:
+                    print(f"⚠️ 获取统计信息失败: {e}")
+            
+            commit_msg += f"\n- 获取模式: {fetch_mode}"
+            commit_msg += f"\n- 更新时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}"
+            commit_msg += f"\n- 触发方式: {event_name}"
+            commit_msg += f"\n- 工作流运行: {run_number}"
+            
+            if skip_classification == "true":
+                commit_msg += "\n- 跳过AI分类: 是"
             
             # 提交变更
             subprocess.run(['git', 'commit', '-m', commit_msg], check=True)
@@ -335,49 +358,63 @@ class WorkflowUtils:
 
 def main():
     """主函数 - 用于命令行调用"""
-    import argparse
+    import sys
     
-    parser = argparse.ArgumentParser(description='工作流辅助工具')
-    parser.add_argument('command', choices=['create-dirs', 'check-changes', 'commit-push', 
-                                          'summary', 'cleanup', 'diagnostics'],
-                       help='要执行的命令')
-    parser.add_argument('--fetch-mode', default='incremental', help='获取模式')
-    parser.add_argument('--workflow-run', default='1', help='工作流运行编号')
-    parser.add_argument('--github-event', default='manual', help='GitHub事件类型')
-    parser.add_argument('--skip-classification', action='store_true', help='跳过AI分类')
-    parser.add_argument('--workflow-url', default='', help='工作流URL')
-    
-    args = parser.parse_args()
+    if len(sys.argv) < 2:
+        print("Usage: python workflow_utils.py <command> [args...]")
+        print("Commands:")
+        print("  create-dirs - Create necessary directories")
+        print("  check-changes - Check for git changes")
+        print("  commit-push <fetch_mode> <workflow_run> <skip_classification> - Commit and push changes")
+        print("  summary <fetch_mode> <workflow_run> <github_event> <skip_classification> <workflow_url> - Generate execution summary")
+        print("  cleanup - Clean temporary files")
+        print("  diagnostics <workflow_run> <github_event> - Run failure diagnosis")
+        sys.exit(1)
     
     utils = WorkflowUtils()
+    command = sys.argv[1]
     
-    if args.command == 'create-dirs':
+    if command == "create-dirs":
         success = utils.create_directories()
         exit(0 if success else 1)
     
-    elif args.command == 'check-changes':
+    elif command == "check-changes":
         has_changes, files = utils.check_file_changes()
         print(f"has_changes={str(has_changes).lower()}")
         if files:
             print(f"changed_files={','.join(files)}")
     
-    elif args.command == 'commit-push':
+    elif command == "commit-push" and len(sys.argv) >= 5:
+        fetch_mode = sys.argv[2]
+        workflow_run = sys.argv[3]
+        skip_classification = sys.argv[4].lower() == 'true'
         success = utils.commit_and_push_changes(
-            args.fetch_mode, args.workflow_run, args.skip_classification
+            fetch_mode, workflow_run, skip_classification
         )
         exit(0 if success else 1)
     
-    elif args.command == 'summary':
+    elif command == "summary" and len(sys.argv) >= 7:
+        fetch_mode = sys.argv[2]
+        workflow_run = sys.argv[3]
+        github_event = sys.argv[4]
+        skip_classification = sys.argv[5].lower() == 'true'
+        workflow_url = sys.argv[6] if len(sys.argv) > 6 else ""
         utils.generate_execution_summary(
-            args.fetch_mode, args.workflow_run, args.github_event,
-            args.skip_classification, args.workflow_url
+            fetch_mode, workflow_run, github_event,
+            skip_classification, workflow_url
         )
     
-    elif args.command == 'cleanup':
+    elif command == "cleanup":
         utils.cleanup_temp_files()
     
-    elif args.command == 'diagnostics':
-        utils.handle_failure_diagnostics(args.workflow_run, args.github_event)
+    elif command == "diagnostics" and len(sys.argv) >= 4:
+        workflow_run = sys.argv[2]
+        github_event = sys.argv[3]
+        utils.handle_failure_diagnostics(workflow_run, github_event)
+    
+    else:
+        print(f"Unknown command or insufficient arguments: {command}")
+        sys.exit(1)
 
 
 if __name__ == "__main__":

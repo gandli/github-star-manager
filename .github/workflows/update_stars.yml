@@ -281,57 +281,8 @@ jobs:
           python src/workflow_utils.py summary "${{ github.event.created_at }}" "$FETCH_MODE" "${{ github.event_name }}" "${{ github.run_number }}" "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" "${{ github.event.inputs.skip_classification }}" "${{ steps.check_changes.outputs.has_changes }}"
       
       # 16. 错误处理和清理
-      - name: 🧹 清理和错误处理
+      - name: 🧹 错误处理和清理
         if: failure()
         run: |
-          echo "❌ 工作流执行失败，开始诊断和清理..."
-          
-          # 显示失败的步骤信息
-          echo "🔍 失败诊断:"
-          echo "  - 失败时间: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
-          echo "  - 运行编号: ${{ github.run_number }}"
-          echo "  - 触发方式: ${{ github.event_name }}"
-          
-          # 显示错误日志
-          if [ -d "logs" ]; then
-            echo "📋 应用错误日志:"
-            find logs -name "*.log" -type f -exec echo "=== {} ===" \; -exec head -50 {} \;
-          else
-            echo "📋 没有找到应用日志目录"
-          fi
-          
-          # 检查数据文件状态
-          echo "📊 数据文件状态:"
-          if [ -f "data/stars_data.json" ]; then
-            echo "  - stars_data.json: 存在 ($(stat -c%s data/stars_data.json 2>/dev/null || stat -f%z data/stars_data.json) bytes)"
-          else
-            echo "  - stars_data.json: 不存在"
-          fi
-          
-          # 检查网络连接
-          echo "🌐 网络连接测试:"
-          if curl -s --max-time 10 https://api.github.com > /dev/null; then
-            echo "  - GitHub API: ✅ 可访问"
-          else
-            echo "  - GitHub API: ❌ 无法访问"
-          fi
-          
-          # 显示Python环境信息
-          echo "🐍 Python环境信息:"
-          python --version
-          echo "  - 已安装包:"
-          pip list | head -20
-          
-          # 显示系统资源信息
-          echo "💻 系统资源信息:"
-          echo "  - 系统: $(uname -s) $(uname -r)"
-          echo "  - 磁盘空间: $(df -h . | tail -1 | awk '{print $4}') 可用"
-          echo "  - 内存: $(free -h | grep '^Mem:' | awk '{print $7}') 可用"
-          
-          # 清理临时文件
-          echo "🧹 清理临时文件..."
-          find . -name "*.tmp" -type f -delete 2>/dev/null || true
-          find . -name "*.pyc" -type f -delete 2>/dev/null || true
-          find . -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
-          
-          echo "🧹 清理完成"
+          echo "❌ 工作流执行失败，开始诊断..."
+          python src/workflow_utils.py failure_diagnosis ${{ github.run_number }} ${{ github.event_name }} ${{ github.ref_name }} ${{ github.sha }}
