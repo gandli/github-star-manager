@@ -11,7 +11,7 @@ github:
   # 重试间隔（秒）
   retry_delay: 2
   # 全量模式最大获取数量
-  max_full_fetch: 1000
+  max_full_fetch: 9999
   # 增量模式最大获取数量
   max_incremental_fetch: 100
 

@@ -449,24 +449,45 @@ URL：{{}}
 def main():
     """主函数"""
     import sys
+    import argparse
     
-    if len(sys.argv) < 2:
-        print("Usage: python classify.py <data_file>")
-        sys.exit(1)
+    parser = argparse.ArgumentParser(description='AI分类工具 - 对GitHub仓库进行智能分类')
+    parser.add_argument('data_file', nargs='?', default='data/github_stars.json', 
+                       help='数据文件路径 (默认: data/github_stars.json)')
+    parser.add_argument('--config', default='config.yaml', 
+                       help='配置文件路径 (默认: config.yaml)')
+    parser.add_argument('--batch-size', type=int, default=10, 
+                       help='批处理大小 (默认: 10)')
+    parser.add_argument('--max-workers', type=int, default=5, 
+                       help='最大工作线程数 (默认: 5)')
     
-    data_file = sys.argv[1]
+    args = parser.parse_args()
+    data_file = args.data_file
     
     try:
+        # 检查数据文件是否存在
+        if not os.path.exists(data_file):
+            print(f"错误: 数据文件 '{data_file}' 不存在")
+            print("请先运行 fetch_stars.py 获取GitHub Star数据")
+            sys.exit(1)
+        
         # 加载数据
         with open(data_file, 'r', encoding='utf-8') as f:
             data = json.load(f)
         
         repos = data.get('repositories', [])
         
+        if not repos:
+            print("数据文件中没有找到仓库数据")
+            sys.exit(1)
+        
+        print(f"加载了 {len(repos)} 个仓库")
+        
         # 初始化分类器
-        classifier = AIClassifier()
+        classifier = AIClassifier(config_path=args.config)
         
         # 执行分类
+        print("开始AI分类...")
         updated_repos = classifier.update_repositories_with_classification(repos)
         
         # 更新数据
@@ -477,7 +498,7 @@ def main():
             json.dump(data, f, ensure_ascii=False, indent=2)
         
         classified_count = sum(1 for repo in updated_repos if repo.get('is_classified', False))
-        print(f"Classification completed: {classified_count}/{len(updated_repos)} repositories classified")
+        print(f"分类完成: {classified_count}/{len(updated_repos)} 个仓库已分类")
         
     except Exception as e:
         logging.error(f"Error in main execution: {e}")
