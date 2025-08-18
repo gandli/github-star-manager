@@ -86,14 +86,11 @@ jobs:
         run: |
           python src/workflow_utils.py create-dirs
       
-      # 7. 设置运行时环境变量
+      # 6. 设置运行时环境变量
       - name: ⚙️ 配置运行环境
         run: |
           # 确定获取模式
-          if [ "${{ github.event.inputs.force_full_fetch }}" = "true" ]; then
-            echo "FETCH_MODE=full" >> $GITHUB_ENV
-            echo "🔄 强制全量获取模式"
-          elif [ "${{ github.event_name }}" = "schedule" ]; then
+          if [ "${{ github.event_name }}" = "schedule" ]; then
             echo "FETCH_MODE=incremental" >> $GITHUB_ENV
             echo "⏰ 定时任务 - 增量更新模式"
           elif [ -n "${{ github.event.inputs.fetch_mode }}" ]; then
@@ -104,66 +101,30 @@ jobs:
             echo "📝 默认 - 增量更新模式"
           fi
           
-          # 设置最大仓库数量
-          if [ -n "${{ github.event.inputs.max_repositories }}" ]; then
-            echo "MAX_REPOSITORIES=${{ github.event.inputs.max_repositories }}" >> $GITHUB_ENV
-            echo "📊 自定义最大仓库数量: ${{ github.event.inputs.max_repositories }}"
-          fi
-          
-          # 设置其他环境变量（使用掩码保护敏感信息）
-          echo "GH_PAT=${{ secrets.GH_PAT }}" >> $GITHUB_ENV
-          echo "GITHUB_USERNAME=${{ github.actor }}" >> $GITHUB_ENV
-          
-          # 只在需要时设置AI相关环境变量
-          if [ "${{ github.event.inputs.skip_classification }}" != "true" ]; then
-            echo "AI_API_KEY=${{ secrets.AI_API_KEY }}" >> $GITHUB_ENV
-            echo "AI_ACCOUNT_ID=${{ secrets.AI_ACCOUNT_ID }}" >> $GITHUB_ENV
-          fi
-          
-          # 设置安全相关环境变量
-          echo "PYTHONUNBUFFERED=1" >> $GITHUB_ENV  # 确保Python输出不被缓冲
-          echo "PYTHONDONTWRITEBYTECODE=1" >> $GITHUB_ENV  # 不生成.pyc文件
-          
           echo "✅ 环境变量配置完成"
       
-      # 8. 获取Star项目数据
+      # 7. 获取Star项目数据
       - name: ⭐ 获取GitHub Star项目
         timeout-minutes: 30
         run: |
           echo "🚀 开始获取GitHub Star项目..."
           echo "📋 获取模式: $FETCH_MODE"
           
-          # 添加重试机制
-          retry_count=0
-          max_retries=3
-          
-          while [ $retry_count -lt $max_retries ]; do
-            if python src/fetch_stars.py; then
-              echo "✅ Star项目获取成功"
-              
-              # 显示获取统计
-              python src/stats.py project_stats
-              break
-            else
-              retry_count=$((retry_count + 1))
-              if [ $retry_count -lt $max_retries ]; then
-                echo "⚠️ 获取失败，等待30秒后重试 ($retry_count/$max_retries)..."
-                sleep 30
-              else
-                echo "❌ Star项目获取失败，已达到最大重试次数"
-                exit 1
-              fi
-            fi
-          done
+          if python src/fetch_stars.py; then
+            echo "✅ Star项目获取成功"
+            python src/stats.py project_stats
+          else
+            echo "❌ Star项目获取失败"
+            exit 1
+          fi
       
-      # 9. AI分类处理
+      # 8. AI分类处理
       - name: 🤖 AI智能分类
         if: github.event.inputs.skip_classification != 'true'
-        timeout-minutes: 45
+        timeout-minutes: 30
         run: |
           echo "🧠 开始AI智能分类..."
           
-          # 检查是否有需要分类的项目
           if [ -f "data/stars_data.json" ]; then
             unclassified_count=$(python src/stats.py unclassified)
             
@@ -172,100 +133,47 @@ jobs:
             else
               echo "📊 发现 $unclassified_count 个未分类项目，开始AI分类..."
               
-              # 添加重试机制
-              retry_count=0
-              max_retries=2
-              
-              while [ $retry_count -lt $max_retries ]; do
-                if python src/classify.py; then
-                  echo "✅ AI分类完成"
-                  
-                  # 显示分类统计
-                  python src/stats.py classification
-                  break
-                else
-                  retry_count=$((retry_count + 1))
-                  if [ $retry_count -lt $max_retries ]; then
-                    echo "⚠️ AI分类失败，等待60秒后重试 ($retry_count/$max_retries)..."
-                    sleep 60
-                  else
-                    echo "❌ AI分类失败，已达到最大重试次数"
-                    exit 1
-                  fi
-                fi
-              done
+              if python src/classify.py; then
+                echo "✅ AI分类完成"
+                python src/stats.py classification
+              else
+                echo "❌ AI分类失败"
+                exit 1
+              fi
             fi
           else
             echo "❌ 数据文件不存在，跳过AI分类"
           fi
       
-      # 10. 生成分类文档
+      # 9. 生成分类文档
       - name: 📝 生成分类文档
         run: |
           echo "📚 开始生成分类文档..."
-          
           python src/generate_category_docs.py
-          
-          if [ $? -eq 0 ]; then
-            echo "✅ 分类文档生成成功"
-            
-            # 显示生成的文档
-            if [ -d "docs" ]; then
-              doc_count=$(find docs -name "*.md" -type f | wc -l)
-              echo "📄 生成文档数量: $doc_count"
-              echo "📋 生成的文档:"
-              find docs -name "*.md" -type f -exec basename {} \; | sort
-            fi
-          else
-            echo "❌ 分类文档生成失败"
-            exit 1
-          fi
+          echo "✅ 分类文档生成完成"
       
-      # 11. 更新README
+      # 10. 更新README
       - name: 📖 更新README文件
         run: |
           echo "📝 开始更新README..."
-          
           python src/update_readme.py
-          
-          if [ $? -eq 0 ]; then
-            echo "✅ README更新成功"
-          else
-            echo "❌ README更新失败"
-            exit 1
-          fi
+          echo "✅ README更新完成"
       
-      # 12. 检查文件变更
+      # 11. 检查文件变更
       - name: 🔍 检查文件变更
         id: check_changes
         run: |
-          echo "🔍 检查文件变更..."
           python src/workflow_utils.py check-changes
       
-      # 13. 提交变更
-      - name: 💾 提交变更
+      # 12. 提交并推送变更
+      - name: 💾 提交并推送变更
         if: steps.check_changes.outputs.has_changes == 'true'
         run: |
-          echo "💾 提交文件变更..."
           python src/workflow_utils.py commit-changes "$FETCH_MODE" "${{ github.event_name }}" "${{ github.run_number }}" "${{ github.event.inputs.skip_classification }}"
-      
-      # 14. 推送变更
-      - name: 🚀 推送变更
-        if: steps.check_changes.outputs.has_changes == 'true'
-        run: |
-          echo "🚀 推送变更到远程仓库..."
           python src/workflow_utils.py push-changes
       
-      # 15. 生成执行摘要
+      # 13. 生成执行摘要
       - name: 📊 生成执行摘要
         if: always()
         run: |
-          echo "📊 生成执行摘要..."
           python src/workflow_utils.py summary "${{ github.event.created_at }}" "$FETCH_MODE" "${{ github.event_name }}" "${{ github.run_number }}" "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" "${{ github.event.inputs.skip_classification }}" "${{ steps.check_changes.outputs.has_changes }}"
-      
-      # 16. 错误处理和清理
-      - name: 🧹 错误处理和清理
-        if: failure()
-        run: |
-          echo "❌ 工作流执行失败，开始诊断..."
-          python src/workflow_utils.py failure_diagnosis ${{ github.run_number }} ${{ github.event_name }} ${{ github.ref_name }} ${{ github.sha }}
