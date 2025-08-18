@@ -159,10 +159,7 @@ jobs:
               echo "✅ Star项目获取成功"
               
               # 显示获取统计
-              if [ -f "data/stars_data.json" ]; then
-                total_count=$(python -c "import json; data=json.load(open('data/stars_data.json')); print(len(data.get('repositories', [])))") 
-                echo "📊 当前总项目数: $total_count"
-              fi
+              python src/stats.py project_stats
               break
             else
               retry_count=$((retry_count + 1))
@@ -185,51 +182,39 @@ jobs:
           
           # 检查是否有需要分类的项目
           if [ -f "data/stars_data.json" ]; then
-            unclassified_count=$(python -c "
-          import json
-          data = json.load(open('data/stars_data.json'))
-          repos = data.get('repositories', [])
-          unclassified = sum(1 for r in repos if not r.get('is_classified', False))
-          print(unclassified)
-          ")
-                      
-                      if [ "$unclassified_count" -eq "0" ]; then
-                        echo "📝 所有项目已分类，跳过AI分类步骤"
-                      else
-                        echo "📊 发现 $unclassified_count 个未分类项目，开始AI分类..."
-                        
-                        # 添加重试机制
-                        retry_count=0
-                        max_retries=2
-                        
-                        while [ $retry_count -lt $max_retries ]; do
-                          if python src/classify.py; then
-                            echo "✅ AI分类完成"
-                            
-                            # 显示分类统计
-                            python -c "
-          import json
-          data = json.load(open('data/stars_data.json'))
-          repos = data.get('repositories', [])
-          classified = sum(1 for r in repos if r.get('is_classified', False))
-          print(f'📊 已分类项目: {classified}/{len(repos)}')
-          "
-                            break
-                          else
-                            retry_count=$((retry_count + 1))
-                            if [ $retry_count -lt $max_retries ]; then
-                              echo "⚠️ AI分类失败，等待60秒后重试 ($retry_count/$max_retries)..."
-                              sleep 60
-                            else
-                              echo "❌ AI分类失败，已达到最大重试次数"
-                              exit 1
-                            fi
-                          fi
-                        done
-                      fi
-                    else
-                      echo "❌ 数据文件不存在，跳过AI分类"
-                    fi
+            unclassified_count=$(python src/stats.py unclassified)
+            
+            if [ "$unclassified_count" -eq "0" ]; then
+              echo "📝 所有项目已分类，跳过AI分类步骤"
+            else
+              echo "📊 发现 $unclassified_count 个未分类项目，开始AI分类..."
+              
+              # 添加重试机制
+              retry_count=0
+              max_retries=2
+              
+              while [ $retry_count -lt $max_retries ]; do
+                if python src/classify.py; then
+                  echo "✅ AI分类完成"
+                  
+                  # 显示分类统计
+                  python src/stats.py classification
+                  break
+                else
+                  retry_count=$((retry_count + 1))
+                  if [ $retry_count -lt $max_retries ]; then
+                    echo "⚠️ AI分类失败，等待60秒后重试 ($retry_count/$max_retries)..."
+                    sleep 60
+                  else
+                    echo "❌ AI分类失败，已达到最大重试次数"
+                    exit 1
+                  fi
+                fi
+              done
+            fi
+          else
+            echo "❌ 数据文件不存在，跳过AI分类"
+          fi
       
       # 10. 生成分类文档
       - name: 📝 生成分类文档
