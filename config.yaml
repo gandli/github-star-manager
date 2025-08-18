@@ -1,0 +1,92 @@
+# GitHub Star Manager 配置文件
+
+# GitHub API 配置
+github:
+  # API 基础URL
+  api_base_url: "https://api.github.com"
+  # 请求超时时间（秒）
+  timeout: 30
+  # 重试次数
+  max_retries: 3
+  # 重试间隔（秒）
+  retry_delay: 2
+  # 全量模式最大获取数量
+  max_full_fetch: 1000
+  # 增量模式最大获取数量
+  max_incremental_fetch: 100
+
+# AI 分类配置
+ai:
+  # Cloudflare Workers AI API 配置
+  api_base_url: "https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/run"
+  # AI 模型名称
+  model: "@cf/meta/llama-3.1-8b-instruct"
+  # 请求超时时间（秒）
+  timeout: 60
+  # 最大并发请求数
+  max_concurrent_requests: 2
+  # 重试次数
+  max_retries: 3
+  # 重试间隔（秒）
+  retry_delay: 5
+
+# 项目分类定义
+categories:
+  - "前端开发"
+  - "后端开发"
+  - "机器学习"
+  - "数据科学"
+  - "开发工具"
+  - "网络安全"
+  - "云计算"
+  - "桌面应用"
+  - "移动应用"
+  - "系统工具"
+
+# 数据管理配置
+data:
+  # 数据文件路径
+  stars_data_file: "data/stars_data.json"
+  # 备份文件路径
+  backup_file: "data/stars_data_backup.json"
+  # 是否启用自动备份
+  auto_backup: true
+
+# 文档生成配置
+docs:
+  # 文档输出目录
+  output_dir: "docs"
+  # 每个分类最大显示项目数
+  max_projects_per_category: 50
+  # README 文件路径
+  readme_file: "README.md"
+  # 分类文档模板
+  category_template: "docs/templates/category_template.md"
+
+# 日志配置
+logging:
+  # 日志级别 (DEBUG, INFO, WARNING, ERROR)
+  level: "INFO"
+  # 日志格式
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  # 是否输出到文件
+  to_file: false
+  # 日志文件路径
+  file_path: "logs/app.log"
+
+# 性能配置
+performance:
+  # 批处理大小
+  batch_size: 10
+  # 请求间隔（秒）
+  request_interval: 0.5
+  # 内存使用限制（MB）
+  memory_limit: 512
+
+# 环境变量映射
+env_vars:
+  github_token: "GH_PAT"
+  ai_api_key: "AI_API_KEY"
+  ai_account_id: "AI_ACCOUNT_ID"
+  github_username: "GITHUB_USERNAME"
+  fetch_mode: "FETCH_MODE"

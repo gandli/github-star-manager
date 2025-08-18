@@ -1,0 +1,363 @@
+name: Update GitHub Stars
+
+# 工作流触发条件
+on:
+  # 定时执行：每天UTC时间3点（北京时间11点）
+  schedule:
+    - cron: '0 3 * * *'
+  
+  # 手动触发
+  workflow_dispatch:
+    inputs:
+      fetch_mode:
+        description: '获取模式 (incremental: 增量更新, full: 全量更新)'
+        required: true
+        default: 'incremental'
+        type: choice
+        options:
+          - incremental
+          - full
+      force_full_fetch:
+        description: '强制全量获取（忽略fetch_mode设置）'
+        required: false
+        default: false
+        type: boolean
+      max_repositories:
+        description: '最大获取仓库数量（可选，留空使用配置文件默认值）'
+        required: false
+        type: string
+      skip_classification:
+        description: '跳过AI分类步骤'
+        required: false
+        default: false
+        type: boolean
+
+# 环境变量
+env:
+  PYTHON_VERSION: '3.9'
+  REQUIREMENTS_FILE: 'requirements.txt'
+
+# 作业定义
+jobs:
+  update-stars:
+    name: 更新GitHub Star项目
+    runs-on: ubuntu-latest
+    
+    # 权限设置
+    permissions:
+      contents: write
+      actions: read
+    
+    steps:
+      # 1. 检出代码
+      - name: 📥 检出代码
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+      
+      # 2. 设置Python环境
+      - name: 🐍 设置Python环境
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+      
+      # 3. 安装依赖
+      - name: 📦 安装Python依赖
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f ${{ env.REQUIREMENTS_FILE }} ]; then
+            pip install -r ${{ env.REQUIREMENTS_FILE }}
+          else
+            echo "⚠️ requirements.txt not found, installing basic dependencies"
+            pip install requests PyYAML
+          fi
+      
+      # 4. 验证环境变量
+      - name: 🔍 验证环境配置
+        run: |
+          echo "🔧 检查必需的环境变量..."
+          
+          # 检查GitHub相关变量
+          if [ -z "${{ secrets.GH_PAT }}" ]; then
+            echo "❌ GH_PAT secret is not set"
+            exit 1
+          fi
+          
+          if [ -z "${{ secrets.GITHUB_USERNAME }}" ]; then
+            echo "❌ GITHUB_USERNAME secret is not set"
+            exit 1
+          fi
+          
+          # 检查AI相关变量（如果不跳过分类）
+          if [ "${{ github.event.inputs.skip_classification }}" != "true" ]; then
+            if [ -z "${{ secrets.AI_API_KEY }}" ]; then
+              echo "❌ AI_API_KEY secret is not set"
+              exit 1
+            fi
+            
+            if [ -z "${{ secrets.AI_ACCOUNT_ID }}" ]; then
+              echo "❌ AI_ACCOUNT_ID secret is not set"
+              exit 1
+            fi
+          fi
+          
+          echo "✅ 环境变量验证通过"
+      
+      # 5. 创建必要的目录
+      - name: 📁 创建目录结构
+        run: |
+          mkdir -p data
+          mkdir -p docs
+          mkdir -p logs
+          echo "✅ 目录结构创建完成"
+      
+      # 6. 设置运行时环境变量
+      - name: ⚙️ 配置运行环境
+        run: |
+          # 确定获取模式
+          if [ "${{ github.event.inputs.force_full_fetch }}" = "true" ]; then
+            echo "FETCH_MODE=full" >> $GITHUB_ENV
+            echo "🔄 强制全量获取模式"
+          elif [ "${{ github.event_name }}" = "schedule" ]; then
+            echo "FETCH_MODE=incremental" >> $GITHUB_ENV
+            echo "⏰ 定时任务 - 增量更新模式"
+          elif [ -n "${{ github.event.inputs.fetch_mode }}" ]; then
+            echo "FETCH_MODE=${{ github.event.inputs.fetch_mode }}" >> $GITHUB_ENV
+            echo "👤 手动触发 - ${{ github.event.inputs.fetch_mode }}模式"
+          else
+            echo "FETCH_MODE=incremental" >> $GITHUB_ENV
+            echo "📝 默认 - 增量更新模式"
+          fi
+          
+          # 设置最大仓库数量
+          if [ -n "${{ github.event.inputs.max_repositories }}" ]; then
+            echo "MAX_REPOSITORIES=${{ github.event.inputs.max_repositories }}" >> $GITHUB_ENV
+            echo "📊 自定义最大仓库数量: ${{ github.event.inputs.max_repositories }}"
+          fi
+          
+          # 设置其他环境变量
+          echo "GH_PAT=${{ secrets.GH_PAT }}" >> $GITHUB_ENV
+          echo "GITHUB_USERNAME=${{ secrets.GITHUB_USERNAME }}" >> $GITHUB_ENV
+          echo "AI_API_KEY=${{ secrets.AI_API_KEY }}" >> $GITHUB_ENV
+          echo "AI_ACCOUNT_ID=${{ secrets.AI_ACCOUNT_ID }}" >> $GITHUB_ENV
+          
+          echo "✅ 环境变量配置完成"
+      
+      # 7. 获取Star项目数据
+      - name: ⭐ 获取GitHub Star项目
+        run: |
+          echo "🚀 开始获取GitHub Star项目..."
+          echo "📋 获取模式: $FETCH_MODE"
+          
+          python src/fetch_stars.py
+          
+          if [ $? -eq 0 ]; then
+            echo "✅ Star项目获取成功"
+            
+            # 显示获取统计
+            if [ -f "data/stars_data.json" ]; then
+              total_count=$(python -c "import json; data=json.load(open('data/stars_data.json')); print(len(data.get('repositories', [])))")
+              echo "📊 当前总项目数: $total_count"
+            fi
+          else
+            echo "❌ Star项目获取失败"
+            exit 1
+          fi
+      
+      # 8. AI分类处理
+      - name: 🤖 AI智能分类
+        if: github.event.inputs.skip_classification != 'true'
+        run: |
+          echo "🧠 开始AI智能分类..."
+          
+          python src/classify.py
+          
+          if [ $? -eq 0 ]; then
+            echo "✅ AI分类完成"
+            
+            # 显示分类统计
+            if [ -f "data/stars_data.json" ]; then
+              python -c "
+import json
+data = json.load(open('data/stars_data.json'))
+repos = data.get('repositories', [])
+classified = sum(1 for r in repos if r.get('is_classified', False))
+print(f'📊 已分类项目: {classified}/{len(repos)}')
+"
+            fi
+          else
+            echo "❌ AI分类失败"
+            exit 1
+          fi
+      
+      # 9. 生成分类文档
+      - name: 📝 生成分类文档
+        run: |
+          echo "📚 开始生成分类文档..."
+          
+          python src/generate_category_docs.py
+          
+          if [ $? -eq 0 ]; then
+            echo "✅ 分类文档生成成功"
+            
+            # 显示生成的文档
+            if [ -d "docs" ]; then
+              doc_count=$(find docs -name "*.md" -type f | wc -l)
+              echo "📄 生成文档数量: $doc_count"
+              echo "📋 生成的文档:"
+              find docs -name "*.md" -type f -exec basename {} \; | sort
+            fi
+          else
+            echo "❌ 分类文档生成失败"
+            exit 1
+          fi
+      
+      # 10. 更新README
+      - name: 📖 更新README文件
+        run: |
+          echo "📝 开始更新README..."
+          
+          python src/update_readme.py
+          
+          if [ $? -eq 0 ]; then
+            echo "✅ README更新成功"
+          else
+            echo "❌ README更新失败"
+            exit 1
+          fi
+      
+      # 11. 检查文件变更
+      - name: 🔍 检查文件变更
+        id: check_changes
+        run: |
+          echo "🔍 检查文件变更..."
+          
+          # 检查是否有变更
+          if git diff --quiet && git diff --cached --quiet; then
+            echo "📝 没有检测到文件变更"
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          else
+            echo "📝 检测到文件变更"
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            
+            echo "📋 变更的文件:"
+            git diff --name-only
+            git diff --cached --name-only
+          fi
+      
+      # 12. 提交变更
+      - name: 💾 提交变更
+        if: steps.check_changes.outputs.has_changes == 'true'
+        run: |
+          echo "💾 提交文件变更..."
+          
+          # 配置Git用户信息
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          
+          # 添加变更的文件
+          git add data/ docs/ README.md
+          
+          # 生成提交信息
+          commit_msg="🤖 自动更新GitHub Star项目数据"
+          
+          if [ "$FETCH_MODE" = "full" ]; then
+            commit_msg="$commit_msg (全量更新)"
+          else
+            commit_msg="$commit_msg (增量更新)"
+          fi
+          
+          commit_msg="$commit_msg\n\n- 获取模式: $FETCH_MODE"
+          commit_msg="$commit_msg\n- 更新时间: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          commit_msg="$commit_msg\n- 触发方式: ${{ github.event_name }}"
+          
+          if [ "${{ github.event.inputs.skip_classification }}" = "true" ]; then
+            commit_msg="$commit_msg\n- 跳过AI分类: 是"
+          fi
+          
+          # 提交变更
+          git commit -m "$commit_msg"
+          
+          echo "✅ 变更提交成功"
+      
+      # 13. 推送变更
+      - name: 🚀 推送变更
+        if: steps.check_changes.outputs.has_changes == 'true'
+        run: |
+          echo "🚀 推送变更到远程仓库..."
+          
+          git push
+          
+          if [ $? -eq 0 ]; then
+            echo "✅ 变更推送成功"
+          else
+            echo "❌ 变更推送失败"
+            exit 1
+          fi
+      
+      # 14. 生成执行摘要
+      - name: 📊 生成执行摘要
+        if: always()
+        run: |
+          echo "📊 ===== 执行摘要 ====="
+          echo "🕐 执行时间: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          echo "🔧 获取模式: $FETCH_MODE"
+          echo "🎯 触发方式: ${{ github.event_name }}"
+          
+          if [ "${{ github.event.inputs.skip_classification }}" = "true" ]; then
+            echo "🤖 AI分类: 跳过"
+          else
+            echo "🤖 AI分类: 执行"
+          fi
+          
+          if [ -f "data/stars_data.json" ]; then
+            echo "📈 数据统计:"
+            python -c "
+import json
+try:
+    data = json.load(open('data/stars_data.json'))
+    repos = data.get('repositories', [])
+    classified = sum(1 for r in repos if r.get('is_classified', False))
+    print(f'  - 总项目数: {len(repos)}')
+    print(f'  - 已分类: {classified}')
+    print(f'  - 未分类: {len(repos) - classified}')
+    if len(repos) > 0:
+        print(f'  - 分类率: {classified/len(repos)*100:.1f}%')
+except Exception as e:
+    print(f'  - 统计获取失败: {e}')
+"
+          fi
+          
+          if [ -d "docs" ]; then
+            doc_count=$(find docs -name "*.md" -type f | wc -l)
+            echo "📚 生成文档: $doc_count 个"
+          fi
+          
+          echo "📝 文件变更: ${{ steps.check_changes.outputs.has_changes }}"
+          echo "========================"
+      
+      # 15. 错误处理和清理
+      - name: 🧹 清理和错误处理
+        if: failure()
+        run: |
+          echo "❌ 工作流执行失败，开始清理..."
+          
+          # 显示错误日志
+          if [ -d "logs" ]; then
+            echo "📋 错误日志:"
+            find logs -name "*.log" -type f -exec echo "=== {} ===" \; -exec cat {} \;
+          fi
+          
+          # 显示Python错误信息
+          echo "🐍 Python环境信息:"
+          python --version
+          pip list
+          
+          # 显示系统信息
+          echo "💻 系统信息:"
+          uname -a
+          df -h
+          
+          echo "🧹 清理完成"

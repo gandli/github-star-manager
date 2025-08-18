@@ -1,0 +1,53 @@
+# GitHub Star Manager - Python依赖包
+# 基于Python 3.8+的GitHub收藏项目管理系统
+
+# 核心依赖
+requests>=2.28.0,<3.0.0          # HTTP请求库，用于GitHub API调用
+PyYAML>=6.0,<7.0                 # YAML配置文件解析
+
+# 数据处理
+json5>=0.9.0,<1.0.0              # 增强的JSON解析，支持注释和更灵活的格式
+
+# 日期时间处理
+python-dateutil>=2.8.0,<3.0.0   # 日期时间解析和处理
+
+# 并发处理（Python 3.8+内置concurrent.futures，但可能需要额外功能）
+# concurrent.futures 是标准库的一部分，无需额外安装
+
+# 可选依赖（用于增强功能）
+# 如果需要更好的JSON处理
+orjson>=3.8.0,<4.0.0             # 高性能JSON库（可选）
+
+# 如果需要更好的HTTP客户端
+httpx>=0.24.0,<1.0.0             # 现代HTTP客户端（可选，可替代requests）
+
+# 如果需要进度条显示
+tqdm>=4.64.0,<5.0.0              # 进度条库（可选）
+
+# 如果需要更好的日志格式化
+coloredlogs>=15.0,<16.0          # 彩色日志输出（可选）
+
+# 如果需要数据验证
+pydantic>=1.10.0,<2.0.0         # 数据验证库（可选）
+
+# 开发和测试依赖（可选）
+# pytest>=7.0.0,<8.0.0           # 测试框架
+# pytest-cov>=4.0.0,<5.0.0       # 测试覆盖率
+# black>=22.0.0,<23.0.0           # 代码格式化
+# flake8>=5.0.0,<6.0.0            # 代码检查
+# mypy>=0.991,<1.0.0              # 类型检查
+
+# 注意事项：
+# 1. 所有版本号都使用了兼容性范围，确保稳定性
+# 2. 核心依赖只包含必需的包，保持轻量级
+# 3. 可选依赖可以根据需要安装
+# 4. 开发依赖已注释，可在开发环境中启用
+
+# 安装命令：
+# pip install -r requirements.txt
+
+# 仅安装核心依赖：
+# pip install requests PyYAML python-dateutil
+
+# 安装所有依赖（包括可选）：
+# pip install -r requirements.txt
