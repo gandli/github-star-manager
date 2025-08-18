@@ -172,7 +172,7 @@ class WorkflowUtils:
         print("🚀 推送变更到远程仓库...")
         
         try:
-            subprocess.run(['git', 'push'], check=True)
+            subprocess.run(['git', 'push','-f'], check=True)
             print("✅ 变更推送成功")
             return True
             
