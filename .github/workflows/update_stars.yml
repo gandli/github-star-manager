@@ -85,10 +85,7 @@ jobs:
             exit 1
           fi
           
-          if [ -z "${{ secrets.GITHUB_USERNAME }}" ]; then
-            echo "❌ GITHUB_USERNAME secret is not set"
-            exit 1
-          fi
+          # GITHUB_USERNAME 可以通过 github.actor 自动获取，无需设置 secret
           
           # 检查AI相关变量（如果不跳过分类）
           if [ "${{ github.event.inputs.skip_classification }}" != "true" ]; then
@@ -139,7 +136,7 @@ jobs:
           
           # 设置其他环境变量
           echo "GH_PAT=${{ secrets.GH_PAT }}" >> $GITHUB_ENV
-          echo "GITHUB_USERNAME=${{ secrets.GITHUB_USERNAME }}" >> $GITHUB_ENV
+          echo "GITHUB_USERNAME=${{ github.actor }}" >> $GITHUB_ENV
           echo "AI_API_KEY=${{ secrets.AI_API_KEY }}" >> $GITHUB_ENV
           echo "AI_ACCOUNT_ID=${{ secrets.AI_ACCOUNT_ID }}" >> $GITHUB_ENV
           
