@@ -133,7 +133,7 @@ jobs:
             else
               echo "📊 发现 $unclassified_count 个未分类项目，开始AI分类..."
               
-              if python src/classify.py; then
+              if python src/classify.py data/stars_data.json; then
                 echo "✅ AI分类完成"
                 python src/stats.py classification
               else
