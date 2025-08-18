@@ -91,9 +91,9 @@ class WorkflowUtils:
             print(f"❌ 检查文件变更失败: {e}")
             return False, []
     
-    def commit_and_push_changes(self, run_number: str, fetch_mode: str = "incremental", 
-                               event_name: str = "manual", skip_classification: str = "false") -> bool:
-        """提交并推送变更到Git仓库"""
+    def commit_changes(self, fetch_mode: str = "incremental", event_name: str = "manual", 
+                      run_number: str = "unknown", skip_classification: str = "false") -> bool:
+        """提交变更到Git仓库"""
         print("💾 提交文件变更...")
         
         try:
@@ -106,13 +106,25 @@ class WorkflowUtils:
             # 添加变更的文件
             files_to_add = ['data/', 'docs/', 'README.md']
             for file_pattern in files_to_add:
-                subprocess.run(['git', 'add', file_pattern], check=False)
+                result = subprocess.run(['git', 'add', file_pattern], capture_output=True, text=True)
+                if result.returncode == 0:
+                    print(f"✅ 添加文件: {file_pattern}")
+                else:
+                    print(f"⚠️ 添加文件失败: {file_pattern} - {result.stderr}")
             
             # 检查是否有文件被添加到暂存区
             result = subprocess.run(['git', 'diff', '--cached', '--quiet'], capture_output=True)
             if result.returncode == 0:
                 print("⚠️ 没有文件被添加到暂存区")
                 return True
+            
+            # 显示将要提交的文件
+            result = subprocess.run(['git', 'diff', '--cached', '--name-only'], 
+                                  capture_output=True, text=True)
+            if result.returncode == 0 and result.stdout.strip():
+                print("📋 将要提交的文件:")
+                for file in result.stdout.strip().split('\n'):
+                    print(f"  - {file}")
             
             # 生成详细的提交信息
             commit_msg = "🤖 自动更新GitHub Star项目数据"
@@ -146,19 +158,40 @@ class WorkflowUtils:
             subprocess.run(['git', 'commit', '-m', commit_msg], check=True)
             print("✅ 变更提交成功")
             
-            # 推送变更
-            print("🚀 推送变更到远程仓库...")
-            subprocess.run(['git', 'push'], check=True)
-            print("✅ 变更推送成功")
-            
             return True
             
         except subprocess.CalledProcessError as e:
-            print(f"❌ Git操作失败: {e}")
+            print(f"❌ Git提交失败: {e}")
             return False
         except Exception as e:
-            print(f"❌ 提交推送失败: {e}")
+            print(f"❌ 提交失败: {e}")
             return False
+    
+    def push_changes(self) -> bool:
+        """推送变更到远程仓库"""
+        print("🚀 推送变更到远程仓库...")
+        
+        try:
+            subprocess.run(['git', 'push'], check=True)
+            print("✅ 变更推送成功")
+            return True
+            
+        except subprocess.CalledProcessError as e:
+            print(f"❌ Git推送失败: {e}")
+            return False
+        except Exception as e:
+            print(f"❌ 推送失败: {e}")
+            return False
+
+    def commit_and_push_changes(self, run_number: str, fetch_mode: str = "incremental", 
+                               event_name: str = "manual", skip_classification: str = "false") -> bool:
+        """提交并推送变更到Git仓库"""
+        # 先提交
+        if not self.commit_changes(fetch_mode, event_name, run_number, skip_classification):
+            return False
+        
+        # 再推送
+        return self.push_changes()
     
     def generate_execution_summary(self, created_at: str, fetch_mode: str, event_name: str, 
                                  run_number: str, workflow_url: str, skip_classification: str, 
