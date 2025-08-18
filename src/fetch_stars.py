@@ -175,27 +175,31 @@ class GitHubStarFetcher:
         # 确定获取参数
         if fetch_mode == 'full':
             max_repos = github_config['max_full_fetch']
-            since_param = None
+            check_updates = False
         else:
             max_repos = github_config['max_incremental_fetch']
-            last_fetch_time = self._get_last_fetch_time()
-            since_param = last_fetch_time
+            check_updates = True
         
         repos = []
         page = 1
         per_page = 100  # GitHub API最大值
+        
+        # 如果是增量模式，先加载现有数据用于比较
+        existing_repos = {}
+        if check_updates:
+            existing_data = self._load_existing_data()
+            if existing_data:
+                existing_repos = {repo['id']: repo for repo in existing_data.get('repositories', [])}
+                self.logger.info(f"Loaded {len(existing_repos)} existing repositories for comparison")
         
         while len(repos) < max_repos:
             # 构建请求参数
             params = {
                 'page': page,
                 'per_page': min(per_page, max_repos - len(repos)),
-                'sort': 'created',
+                'sort': 'updated',  # 按更新时间排序，更容易发现变化
                 'direction': 'desc'
             }
-            
-            if since_param:
-                params['since'] = since_param
             
             # 发送请求
             url = f"{github_config['api_base_url']}/users/{self.username}/starred"
@@ -216,7 +220,23 @@ class GitHubStarFetcher:
                     break
                     
                 processed_repo = self._process_repo_data(repo)
-                repos.append(processed_repo)
+                
+                # 如果是增量模式，检查项目是否有变化
+                if check_updates and existing_repos:
+                    repo_id = processed_repo['id']
+                    if repo_id in existing_repos:
+                        existing_repo = existing_repos[repo_id]
+                        if self._has_repo_changed(existing_repo, processed_repo):
+                            self.logger.info(f"Detected changes in repository: {processed_repo['full_name']}")
+                            repos.append(processed_repo)
+                        # 如果没有变化，跳过这个仓库
+                    else:
+                        # 新的仓库，添加到列表
+                        self.logger.info(f"Found new starred repository: {processed_repo['full_name']}")
+                        repos.append(processed_repo)
+                else:
+                    # 全量模式或没有现有数据，直接添加
+                    repos.append(processed_repo)
             
             self.logger.info(f"Fetched page {page}, total repos: {len(repos)}")
             page += 1
@@ -226,6 +246,46 @@ class GitHubStarFetcher:
         
         self.logger.info(f"Successfully fetched {len(repos)} repositories")
         return repos
+    
+    def _load_existing_data(self) -> Optional[Dict[str, Any]]:
+        """加载现有的数据文件
+        
+        Returns:
+            现有数据字典，如果文件不存在则返回None
+        """
+        data_file = self.config['data']['stars_data_file']
+        if os.path.exists(data_file):
+            try:
+                with open(data_file, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            except Exception as e:
+                self.logger.warning(f"Failed to load existing data: {e}")
+        return None
+    
+    def _has_repo_changed(self, existing_repo: Dict[str, Any], new_repo: Dict[str, Any]) -> bool:
+        """检查仓库信息是否有变化
+        
+        Args:
+            existing_repo: 现有仓库数据
+            new_repo: 新获取的仓库数据
+            
+        Returns:
+            如果有变化返回True，否则返回False
+        """
+        # 检查关键字段是否有变化
+        key_fields = [
+            'name', 'description', 'language', 'stars_count', 
+            'forks_count', 'open_issues_count', 'updated_at'
+        ]
+        
+        for field in key_fields:
+            existing_value = existing_repo.get(field)
+            new_value = new_repo.get(field)
+            if existing_value != new_value:
+                self.logger.debug(f"Field '{field}' changed: {existing_value} -> {new_value}")
+                return True
+        
+        return False
     
     def _process_repo_data(self, repo: Dict[str, Any]) -> Dict[str, Any]:
         """处理仓库数据，提取需要的字段
