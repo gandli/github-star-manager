@@ -82,25 +82,21 @@ class AIClassifier:
         return logger
     
     def _build_classification_prompt(self) -> str:
-        """构建分类提示词
-        
-        Returns:
-            分类提示词字符串
-        """
+        """构建分类提示词"""
         categories_str = "、".join(self.categories)
         
-        prompt = f"""
+        prompt = """
 你是一个专业的GitHub项目分类专家。请根据项目信息对GitHub项目进行分类和分析。
 
-可选分类：{categories_str}
+可选分类：""" + categories_str + """
 
 请严格按照以下JSON格式返回结果，不要包含任何其他文本或代码块标记：
 
-{{
+{
   "category": "选择最合适的分类",
   "summary": "项目的简洁中文摘要（50-100字）",
   "key_features": ["关键特性1", "关键特性2", "关键特性3"]
-}}
+}
 
 分类规则：
 1. 根据项目的主要功能和技术栈选择最合适的分类
@@ -110,12 +106,12 @@ class AIClassifier:
 5. 必须严格按照JSON格式返回，不要添加任何额外的文本
 
 项目信息：
-名称：{{name}}
-描述：{{description}}
-语言：{{language}}
-主题：{{topics}}
-星数：{{stars}}
-URL：{{url}}
+名称：{name}
+描述：{description}
+语言：{language}
+主题：{topics}
+星数：{stars}
+URL：{url}
 """
         return prompt
     
