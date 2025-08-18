@@ -1,7 +1,7 @@
 # GitHub Star Manager配置文件
 
 # 基本配置
-update_interval: 7    # 更新频率（天）
+update_interval: 1    # 更新频率（天）
 max_stars: 50        # 最大获取的Star项目数量
 incremental_update: true  # 是否使用增量更新模式（只获取最新的Star项目）
 max_items_per_doc: 20    # 每个分类文档最大项目数
