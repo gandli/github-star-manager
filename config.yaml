@@ -13,7 +13,7 @@ github:
   # 全量模式最大获取数量
   max_full_fetch: 9999
   # 增量模式最大获取数量
-  max_incremental_fetch: 100
+  max_incremental_fetch: 10
 
 # AI 分类配置
 ai:
