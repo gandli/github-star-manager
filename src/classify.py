@@ -177,9 +177,12 @@ URL：{url}
         Returns:
             提取的JSON数据或None
         """
+        # 清理响应文本
+        cleaned_text = response_text.strip()
+        
         # 尝试直接解析JSON
         try:
-            parsed_result = json.loads(response_text.strip())
+            parsed_result = json.loads(cleaned_text)
             # 确保结果是字典类型，而不是字符串或其他类型
             if isinstance(parsed_result, dict):
                 return parsed_result
@@ -188,16 +191,27 @@ URL：{url}
         
         # 尝试从代码块中提取JSON
         json_pattern = r'```(?:json)?\s*({.*?})\s*```'
-        match = re.search(json_pattern, response_text, re.DOTALL)
+        match = re.search(json_pattern, cleaned_text, re.DOTALL)
         if match:
             try:
                 return json.loads(match.group(1))
             except json.JSONDecodeError:
                 pass
         
-        # 尝试提取花括号内的内容
+        # 尝试提取花括号内的内容（改进的正则表达式）
+        brace_pattern = r'{[\s\S]*?}'
+        matches = re.findall(brace_pattern, cleaned_text)
+        for match in matches:
+            try:
+                # 尝试修复常见的JSON格式问题
+                fixed_json = self._fix_json_format(match)
+                return json.loads(fixed_json)
+            except json.JSONDecodeError:
+                continue
+        
+        # 尝试提取花括号内的内容（更宽松的匹配）
         brace_pattern = r'{[^{}]*(?:{[^{}]*}[^{}]*)*}'
-        matches = re.findall(brace_pattern, response_text, re.DOTALL)
+        matches = re.findall(brace_pattern, cleaned_text, re.DOTALL)
         for match in matches:
             try:
                 return json.loads(match)
@@ -245,6 +259,49 @@ URL：{url}
         
         self.logger.warning(f"Failed to extract JSON from response: {response_text[:200]}...")
         return None
+    
+    def _fix_json_format(self, json_str: str) -> str:
+        """修复常见的JSON格式问题
+        
+        Args:
+            json_str: 可能有格式问题的JSON字符串
+            
+        Returns:
+            修复后的JSON字符串
+        """
+        # 移除多余的空白字符
+        json_str = json_str.strip()
+        
+        # 修复反斜杠转义问题
+        # 先处理无效的转义序列，将单个反斜杠后跟字母的情况替换为双反斜杠
+        json_str = re.sub(r'\\([a-zA-Z])', r'\\\\\1', json_str)
+        # 将 \" 替换为 "
+        json_str = json_str.replace('\\"', '"')
+        # 将多个反斜杠规范化
+        json_str = re.sub(r'\\{4,}', '\\\\', json_str)
+        
+        # 专门处理数组中缺少逗号的问题
+        # 匹配 ["item1""item2""item3"] 格式
+        def fix_array_commas(match):
+            array_content = match.group(1)
+            # 在相邻的字符串之间添加逗号
+            fixed_content = re.sub(r'"\s*"', '","', array_content)
+            return f'[{fixed_content}]'
+        
+        # 应用数组修复
+        json_str = re.sub(r'\[([^\[\]]*?)\]', fix_array_commas, json_str)
+        
+        # 修复对象属性之间缺少逗号的问题
+        # 在 } 和 " 之间添加逗号
+        json_str = re.sub(r'}\s*"', '}, "', json_str)
+        # 在 ] 和 " 之间添加逗号
+        json_str = re.sub(r']\s*"', '], "', json_str)
+        
+        # 修复尾随逗号问题
+        json_str = re.sub(r',\s*}', '}', json_str)
+        json_str = re.sub(r',\s*]', ']', json_str)
+        
+        return json_str
     
     def _validate_classification_result(self, result: Dict[str, Any]) -> bool:
         """验证分类结果的有效性
