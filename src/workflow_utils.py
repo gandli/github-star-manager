@@ -160,40 +160,99 @@ class WorkflowUtils:
             print(f"❌ 提交推送失败: {e}")
             return False
     
-    def generate_execution_summary(self, fetch_mode: str, workflow_run: str, 
-                                 github_event: str, skip_classification: bool = False,
-                                 workflow_url: str = "") -> None:
+    def generate_execution_summary(self, created_at: str, fetch_mode: str, event_name: str, 
+                                 run_number: str, workflow_url: str, skip_classification: str, 
+                                 has_changes: str) -> None:
         """生成执行摘要"""
         print("📊 ===== 执行摘要 =====")
         
         end_time = datetime.utcnow()
         
-        print(f"🕐 开始时间: {self.start_time.strftime('%Y-%m-%d %H:%M:%S UTC')}")
+        print(f"🕐 开始时间: {created_at}")
         print(f"🕐 结束时间: {end_time.strftime('%Y-%m-%d %H:%M:%S UTC')}")
-        print(f"⏱️ 执行时长: {(end_time - self.start_time).total_seconds():.1f} 秒")
         print(f"🔧 获取模式: {fetch_mode}")
-        print(f"🎯 触发方式: {github_event}")
-        print(f"🏃 运行编号: {workflow_run}")
+        print(f"🎯 触发方式: {event_name}")
+        print(f"🏃 运行编号: {run_number}")
         
         if workflow_url:
             print(f"🔗 工作流链接: {workflow_url}")
         
-        if skip_classification:
+        if skip_classification == "true":
             print("🤖 AI分类: 跳过")
         else:
             print("🤖 AI分类: 执行")
         
-        # 使用统计模块获取详细信息
-        try:
-            from .stats import StatsReporter
-            reporter = StatsReporter()
-            reporter.print_project_stats()
-            reporter.print_doc_stats()
-        except Exception as e:
-            print(f"⚠️ 统计信息获取失败: {e}")
+        print(f"📝 文件变更: {has_changes}")
+        
+        # 详细的数据统计
+        if os.path.exists("data/stars_data.json"):
+            print("📈 数据统计:")
+            try:
+                with open("data/stars_data.json", "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                repos = data.get("repositories", [])
+                classified = sum(1 for r in repos if r.get("is_classified", False))
+                
+                print(f"  - 总项目数: {len(repos)}")
+                print(f"  - 已分类: {classified}")
+                print(f"  - 未分类: {len(repos) - classified}")
+                if len(repos) > 0:
+                    print(f"  - 分类率: {classified/len(repos)*100:.1f}%")
+                
+                # 文件大小
+                file_size = os.path.getsize("data/stars_data.json")
+                print(f"  - 数据文件大小: {file_size/1024:.1f} KB")
+                
+                # 最后更新时间
+                last_update = data.get("metadata", {}).get("last_updated", "Unknown")
+                print(f"  - 最后更新: {last_update}")
+                
+            except Exception as e:
+                print(f"  - 统计获取失败: {e}")
+        else:
+            print("  - ⚠️ 数据文件不存在")
+        
+        # 文档统计
+        if os.path.exists("docs"):
+            doc_files = [f for f in os.listdir("docs") if f.endswith(".md")]
+            doc_count = len(doc_files)
+            print(f"📚 生成文档: {doc_count} 个")
+            
+            # 显示文档列表
+            if doc_count > 0:
+                print("📋 文档列表:")
+                for doc in sorted(doc_files):
+                    print(f"  - {doc}")
+        else:
+            print("📚 生成文档: 0 个")
         
         # 性能统计
-        self._print_performance_stats()
+        print("⚡ 性能统计:")
+        try:
+            # 磁盘使用情况
+            disk_usage = subprocess.run(["df", "-h", "."], capture_output=True, text=True)
+            if disk_usage.returncode == 0:
+                lines = disk_usage.stdout.strip().split("\n")
+                if len(lines) > 1:
+                    parts = lines[1].split()
+                    if len(parts) >= 5:
+                        print(f"  - 磁盘使用: {parts[4]} (已用)")
+        except Exception:
+            print("  - 磁盘使用: 未知")
+        
+        try:
+            # 内存使用情况 (仅在Linux系统上)
+            mem_usage = subprocess.run(["free", "-h"], capture_output=True, text=True)
+            if mem_usage.returncode == 0:
+                lines = mem_usage.stdout.strip().split("\n")
+                for line in lines:
+                    if line.startswith("Mem:"):
+                        parts = line.split()
+                        if len(parts) >= 3:
+                            print(f"  - 内存: {parts[2]}/{parts[1]} (已用/总计)")
+                        break
+        except Exception:
+            print("  - 内存: 未知")
         
         print("========================")
     
@@ -280,9 +339,14 @@ class WorkflowUtils:
         self._show_python_environment()
         
         # 显示系统资源信息
-        from .env_check import EnvironmentChecker
-        checker = EnvironmentChecker()
-        checker.print_system_info()
+        try:
+            from .env_check import EnvironmentChecker
+            checker = EnvironmentChecker()
+            checker.print_system_info()
+        except ImportError:
+            print("⚠️ 环境检查模块不可用")
+        except Exception as e:
+            print(f"⚠️ 系统信息获取失败: {e}")
         
         # 清理临时文件
         self.cleanup_temp_files()
@@ -393,15 +457,17 @@ def main():
         )
         exit(0 if success else 1)
     
-    elif command == "summary" and len(sys.argv) >= 7:
-        fetch_mode = sys.argv[2]
-        workflow_run = sys.argv[3]
-        github_event = sys.argv[4]
-        skip_classification = sys.argv[5].lower() == 'true'
-        workflow_url = sys.argv[6] if len(sys.argv) > 6 else ""
+    elif command == "summary" and len(sys.argv) >= 9:
+        created_at = sys.argv[2]
+        fetch_mode = sys.argv[3]
+        event_name = sys.argv[4]
+        run_number = sys.argv[5]
+        workflow_url = sys.argv[6]
+        skip_classification = sys.argv[7]
+        has_changes = sys.argv[8]
         utils.generate_execution_summary(
-            fetch_mode, workflow_run, github_event,
-            skip_classification, workflow_url
+            created_at, fetch_mode, event_name,
+            run_number, workflow_url, skip_classification, has_changes
         )
     
     elif command == "cleanup":
