@@ -20,40 +20,30 @@
 ### 📊 项目统计
 
 - **总项目数**: 10
-- **已分类项目**: 10
-- **未分类项目**: 0
-- **分类完成率**: 100.0%
-
-### 📂 分类概览
-
-| 分类 | 项目数量 | 文档链接 |
-|------|----------|----------|
-| 前端开发 | 3 | [📖 查看详情](docs/前端开发.md) |
-| 机器学习 | 3 | [📖 查看详情](docs/机器学习.md) |
-| 后端开发 | 2 | [📖 查看详情](docs/后端开发.md) |
-| 网络安全 | 1 | [📖 查看详情](docs/网络安全.md) |
-| 开发工具 | 1 | [📖 查看详情](docs/开发工具.md) |
+- **已分类项目**: 0
+- **未分类项目**: 10
+- **分类完成率**: 0.0%
 
 ### 💻 主要编程语言
 
 | 语言 | 项目数量 | 占比 |
 |------|----------|------|
-| TypeScript | 4 | 40.0% |
-| Python | 2 | 20.0% |
-| Dart | 1 | 10.0% |
-| Ruby | 1 | 10.0% |
+| TypeScript | 3 | 30.0% |
+| Python | 3 | 30.0% |
+| Java | 1 | 10.0% |
+| HTML | 1 | 10.0% |
 | Go | 1 | 10.0% |
-| C++ | 1 | 10.0% |
+| JavaScript | 1 | 10.0% |
 
 ### 🕒 更新信息
 
-- **最后更新时间**: 2025-08-19 03:41:14
+- **最后更新时间**: 2025-08-19 12:22:56
 - **最近添加的项目**:
-  - [keepassxc](https://github.com/keepassxreboot/keepassxc)
-  - [FerretDB](https://github.com/FerretDB/FerretDB)
-  - [discourse](https://github.com/discourse/discourse)
-  - [vite](https://github.com/vitejs/vite)
-  - [ente](https://github.com/ente-io/ente)
+  - [hacktricks](https://github.com/HackTricks-wiki/hacktricks)
+  - [expo](https://github.com/expo/expo)
+  - [transformers](https://github.com/huggingface/transformers)
+  - [pytorch](https://github.com/pytorch/pytorch)
+  - [midscene](https://github.com/web-infra-dev/midscene)
 
 📋 [查看完整分类索引](docs/index.md)
 
