@@ -28,30 +28,32 @@
 
 | 分类 | 项目数量 | 文档链接 |
 |------|----------|----------|
-| 机器学习 | 7 | [📖 查看详情](docs/机器学习.md) |
-| 数据科学 | 1 | [📖 查看详情](docs/数据科学.md) |
+| 前端开发 | 3 | [📖 查看详情](docs/前端开发.md) |
+| 机器学习 | 3 | [📖 查看详情](docs/机器学习.md) |
+| 后端开发 | 2 | [📖 查看详情](docs/后端开发.md) |
+| 网络安全 | 1 | [📖 查看详情](docs/网络安全.md) |
 | 开发工具 | 1 | [📖 查看详情](docs/开发工具.md) |
-| 移动应用 | 1 | [📖 查看详情](docs/移动应用.md) |
 
 ### 💻 主要编程语言
 
 | 语言 | 项目数量 | 占比 |
 |------|----------|------|
 | TypeScript | 4 | 40.0% |
-| Jupyter Notebook | 2 | 20.0% |
 | Python | 2 | 20.0% |
-| Shell | 1 | 10.0% |
 | Dart | 1 | 10.0% |
+| Ruby | 1 | 10.0% |
+| Go | 1 | 10.0% |
+| C++ | 1 | 10.0% |
 
 ### 🕒 更新信息
 
-- **最后更新时间**: 2025-08-18 17:05:37
+- **最后更新时间**: 2025-08-19 03:41:14
 - **最近添加的项目**:
-  - [langchain](https://github.com/langchain-ai/langchain)
-  - [gptme](https://github.com/gptme/gptme)
-  - [flutter](https://github.com/flutter/flutter)
-  - [vscodium](https://github.com/VSCodium/vscodium)
-  - [pytorch](https://github.com/pytorch/pytorch)
+  - [keepassxc](https://github.com/keepassxreboot/keepassxc)
+  - [FerretDB](https://github.com/FerretDB/FerretDB)
+  - [discourse](https://github.com/discourse/discourse)
+  - [vite](https://github.com/vitejs/vite)
+  - [ente](https://github.com/ente-io/ente)
 
 📋 [查看完整分类索引](docs/index.md)
 
