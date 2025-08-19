@@ -150,6 +150,76 @@ class CategoryDocGenerator:
         toc += "\n---\n\n"
         return toc
     
+    def _check_document_needs_update(self, category: str, repos: List[Dict[str, Any]]) -> bool:
+        """检查分类文档是否需要更新
+        
+        Args:
+            category: 分类名称
+            repos: 仓库列表
+            
+        Returns:
+            是否需要更新
+        """
+        filename = f"{category.replace('/', '_')}.md"
+        filepath = os.path.join(self.output_dir, filename)
+        
+        # 如果文件不存在，需要创建
+        if not os.path.exists(filepath):
+            self.logger.info(f"Document does not exist, creating new: {filepath}")
+            return True
+        
+        try:
+            # 读取现有文档
+            with open(filepath, 'r', encoding='utf-8') as f:
+                content = f.read()
+            
+            # 检查仓库数量是否变化
+            import re
+            total_pattern = re.compile(r'本分类共有 \*\*(\d+)\*\* 个项目')
+            match = total_pattern.search(content)
+            if not match:
+                return True
+            
+            old_total = int(match.group(1))
+            new_total = len(repos)
+            
+            if old_total != new_total:
+                self.logger.info(f"Repository count changed for {category}: {old_total} -> {new_total}")
+                return True
+            
+            # 检查仓库列表是否变化（通过检查仓库名称和星数）
+            repo_pattern = re.compile(r'### \[([^\]]+)\]\([^\)]+\).*?\*\*星数\*\*: ⭐ ([\d,]+)', re.DOTALL)
+            repo_matches = repo_pattern.findall(content)
+            
+            if len(repo_matches) != min(len(repos), self.max_projects):
+                self.logger.info(f"Displayed repository count changed for {category}")
+                return True
+            
+            # 创建现有文档中的仓库映射
+            existing_repos = {}
+            for name, stars_str in repo_matches:
+                stars = int(stars_str.replace(',', ''))
+                existing_repos[name] = stars
+            
+            # 检查前N个仓库是否有变化
+            sorted_repos = sorted(repos, key=lambda x: x.get('stargazers_count', 0), reverse=True)
+            display_repos = sorted_repos[:self.max_projects]
+            
+            for repo in display_repos:
+                name = repo.get('name', '')
+                stars = repo.get('stargazers_count', 0)
+                
+                if name not in existing_repos or existing_repos[name] != stars:
+                    self.logger.info(f"Repository {name} changed or new in {category}")
+                    return True
+            
+            self.logger.info(f"No changes detected for category: {category}")
+            return False
+            
+        except Exception as e:
+            self.logger.error(f"Error checking document update for {category}: {e}")
+            return True  # 出错时默认更新
+    
     def generate_category_document(self, category: str) -> bool:
         """生成单个分类的文档
         
@@ -166,6 +236,11 @@ class CategoryDocGenerator:
             if not all_repos:
                 self.logger.warning(f"No repositories found for category: {category}")
                 return False
+            
+            # 检查文档是否需要更新
+            if not self._check_document_needs_update(category, all_repos):
+                self.logger.info(f"Skipping unchanged category document: {category}")
+                return True
             
             # 按星数排序并限制数量
             sorted_repos = sorted(all_repos, key=lambda x: x.get('stargazers_count', 0), reverse=True)
@@ -249,6 +324,81 @@ class CategoryDocGenerator:
         
         return results
     
+    def _check_index_needs_update(self, stats: Dict[str, Any]) -> bool:
+        """检查索引文档是否需要更新
+        
+        Args:
+            stats: 统计信息
+            
+        Returns:
+            是否需要更新
+        """
+        index_path = os.path.join(self.output_dir, "index.md")
+        
+        # 如果文件不存在，需要创建
+        if not os.path.exists(index_path):
+            self.logger.info(f"Index document does not exist, creating new: {index_path}")
+            return True
+        
+        try:
+            # 读取现有索引文档
+            with open(index_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+            
+            # 检查分类数量和项目总数是否变化
+            import re
+            stats_pattern = re.compile(r'总共有 \*\*(\d+)\*\* 个分类，包含 \*\*(\d+)\*\* 个项目')
+            match = stats_pattern.search(content)
+            if not match:
+                return True
+            
+            old_category_count = int(match.group(1))
+            old_repo_count = int(match.group(2))
+            
+            new_category_count = len(stats.get('categories', {}))
+            new_repo_count = stats['basic']['total_repositories']
+            
+            if old_category_count != new_category_count or old_repo_count != new_repo_count:
+                self.logger.info(f"Stats changed: categories {old_category_count}->{new_category_count}, repos {old_repo_count}->{new_repo_count}")
+                return True
+            
+            # 检查分类列表是否变化
+            category_pattern = re.compile(r'\| ([^|]+) \| (\d+) \|')
+            category_matches = category_pattern.findall(content)
+            
+            if len(category_matches) != new_category_count:
+                self.logger.info(f"Category count mismatch in index: {len(category_matches)} vs {new_category_count}")
+                return True
+            
+            # 检查每个分类的项目数量是否变化
+            categories = stats.get('categories', {})
+            for category_name, count_str in category_matches:
+                category_name = category_name.strip()
+                old_count = int(count_str)
+                new_count = categories.get(category_name, 0)
+                
+                if old_count != new_count:
+                    self.logger.info(f"Category count changed: {category_name} {old_count}->{new_count}")
+                    return True
+            
+            # 检查分类完成率是否变化
+            completion_pattern = re.compile(r'\*\*分类完成率\*\*: ([\d\.]+)%')
+            completion_match = completion_pattern.search(content)
+            if completion_match:
+                old_rate = float(completion_match.group(1))
+                new_rate = stats['basic']['classification_rate']
+                
+                if abs(old_rate - new_rate) > 0.1:  # 允许0.1%的误差
+                    self.logger.info(f"Classification rate changed: {old_rate}%->{new_rate}%")
+                    return True
+            
+            self.logger.info("No changes detected for index document")
+            return False
+            
+        except Exception as e:
+            self.logger.error(f"Error checking index update: {e}")
+            return True  # 出错时默认更新
+    
     def generate_category_index(self) -> bool:
         """生成分类索引文档
         
@@ -258,6 +408,12 @@ class CategoryDocGenerator:
         try:
             data = self.data_manager.load_data()
             stats = self.data_manager.get_statistics(data)
+            
+            # 检查索引是否需要更新
+            if not self._check_index_needs_update(stats):
+                self.logger.info("Skipping unchanged index document")
+                return True
+            
             categories = stats.get('categories', {})
             
             # 生成索引内容
@@ -339,32 +495,70 @@ class CategoryDocGenerator:
 def main():
     """主函数"""
     import sys
+    import argparse
     
     try:
+        # 创建命令行参数解析器
+        parser = argparse.ArgumentParser(description='GitHub Star Manager - 分类文档生成工具')
+        subparsers = parser.add_subparsers(dest='command', help='命令')
+        
+        # 生成所有文档的命令
+        all_parser = subparsers.add_parser('all', help='生成所有分类文档')
+        all_parser.add_argument('--force', action='store_true', help='强制全量更新所有文档')
+        
+        # 生成单个分类文档的命令
+        category_parser = subparsers.add_parser('category', help='生成指定分类的文档')
+        category_parser.add_argument('name', help='分类名称')
+        category_parser.add_argument('--force', action='store_true', help='强制更新文档')
+        
+        # 生成索引文档的命令
+        index_parser = subparsers.add_parser('index', help='生成索引文档')
+        index_parser.add_argument('--force', action='store_true', help='强制更新索引')
+        
+        # 清理旧文档的命令
+        subparsers.add_parser('clean', help='清理旧文档')
+        
+        # 解析命令行参数
+        if len(sys.argv) > 1:
+            args = parser.parse_args()
+        else:
+            # 默认生成所有文档
+            args = parser.parse_args(['all'])
+        
+        # 创建文档生成器
         generator = CategoryDocGenerator()
         
-        if len(sys.argv) > 1:
-            command = sys.argv[1]
+        # 根据命令执行相应操作
+        if args.command == 'category':
+            # 如果指定了强制更新，临时修改检查方法
+            if args.force:
+                generator._check_document_needs_update = lambda category, repos: True
             
-            if command == 'category' and len(sys.argv) > 2:
-                # 生成指定分类的文档
-                category = sys.argv[2]
-                success = generator.generate_category_document(category)
-                print(f"Category document generation {'successful' if success else 'failed'}")
-                
-            elif command == 'index':
-                # 生成索引文档
-                success = generator.generate_category_index()
-                print(f"Index generation {'successful' if success else 'failed'}")
-                
-            elif command == 'clean':
-                # 清理旧文档
-                generator.clean_old_documents()
-                print("Document cleanup completed")
-                
-            else:
-                print("Unknown command")
-        else:
+            # 生成指定分类的文档
+            success = generator.generate_category_document(args.name)
+            print(f"Category document generation {'successful' if success else 'failed'}")
+            
+        elif args.command == 'index':
+            # 如果指定了强制更新，临时修改检查方法
+            if args.force:
+                generator._check_index_needs_update = lambda stats: True
+            
+            # 生成索引文档
+            success = generator.generate_category_index()
+            print(f"Index generation {'successful' if success else 'failed'}")
+            
+        elif args.command == 'clean':
+            # 清理旧文档
+            generator.clean_old_documents()
+            print("Document cleanup completed")
+            
+        else:  # 'all' 命令或默认情况
+            # 如果指定了强制更新，临时修改检查方法
+            if hasattr(args, 'force') and args.force:
+                generator._check_document_needs_update = lambda category, repos: True
+                generator._check_index_needs_update = lambda stats: True
+                print("Forcing full update of all documents")
+            
             # 生成所有文档
             results = generator.generate_all_category_documents()
             generator.generate_category_index()
