@@ -20,7 +20,8 @@ ai:
   # Cloudflare Workers AI API 配置
   api_base_url: "https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/run"
   # AI 模型名称
-  model: "@cf/meta/llama-3.1-8b-instruct"
+  # model: "@cf/meta/llama-3.1-8b-instruct"
+  model: "@cf/openai/gpt-oss-20b"
   # 请求超时时间（秒）
   timeout: 60
   # 最大并发请求数
