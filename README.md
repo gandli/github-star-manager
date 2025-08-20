@@ -28,22 +28,23 @@
 
 | 语言 | 项目数量 | 占比 |
 |------|----------|------|
-| TypeScript | 3 | 30.0% |
-| Python | 3 | 30.0% |
-| Java | 1 | 10.0% |
-| HTML | 1 | 10.0% |
+| TypeScript | 4 | 40.0% |
+| PowerShell | 1 | 10.0% |
+| Rust | 1 | 10.0% |
+| Python | 1 | 10.0% |
 | Go | 1 | 10.0% |
-| JavaScript | 1 | 10.0% |
+| HTML | 1 | 10.0% |
+| Ruby | 1 | 10.0% |
 
 ### 🕒 更新信息
 
-- **最后更新时间**: 2025-08-19 12:22:56
+- **最后更新时间**: 2025-08-20 03:40:38
 - **最近添加的项目**:
-  - [hacktricks](https://github.com/HackTricks-wiki/hacktricks)
-  - [expo](https://github.com/expo/expo)
-  - [transformers](https://github.com/huggingface/transformers)
-  - [pytorch](https://github.com/pytorch/pytorch)
-  - [midscene](https://github.com/web-infra-dev/midscene)
+  - [homebrew-cask](https://github.com/Homebrew/homebrew-cask)
+  - [tdesign-miniprogram](https://github.com/Tencent/tdesign-miniprogram)
+  - [rybbit](https://github.com/rybbit-io/rybbit)
+  - [teable](https://github.com/teableio/teable)
+  - [opencode](https://github.com/sst/opencode)
 
 📋 [查看完整分类索引](docs/index.md)
 
