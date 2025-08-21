@@ -28,23 +28,21 @@
 
 | 语言 | 项目数量 | 占比 |
 |------|----------|------|
-| TypeScript | 4 | 40.0% |
-| PowerShell | 1 | 10.0% |
-| Rust | 1 | 10.0% |
-| Python | 1 | 10.0% |
+| Python | 5 | 50.0% |
+| Rust | 2 | 20.0% |
 | Go | 1 | 10.0% |
-| HTML | 1 | 10.0% |
-| Ruby | 1 | 10.0% |
+| TypeScript | 1 | 10.0% |
+| Vue | 1 | 10.0% |
 
 ### 🕒 更新信息
 
-- **最后更新时间**: 2025-08-20 03:40:38
+- **最后更新时间**: 2025-08-21 03:40:09
 - **最近添加的项目**:
-  - [homebrew-cask](https://github.com/Homebrew/homebrew-cask)
-  - [tdesign-miniprogram](https://github.com/Tencent/tdesign-miniprogram)
-  - [rybbit](https://github.com/rybbit-io/rybbit)
-  - [teable](https://github.com/teableio/teable)
-  - [opencode](https://github.com/sst/opencode)
+  - [fiftyone](https://github.com/voxel51/fiftyone)
+  - [ComfyUI](https://github.com/comfyanonymous/ComfyUI)
+  - [streamlit](https://github.com/streamlit/streamlit)
+  - [todo-vue](https://github.com/mdn/todo-vue)
+  - [rolldown](https://github.com/rolldown/rolldown)
 
 📋 [查看完整分类索引](docs/index.md)
 
