@@ -28,21 +28,19 @@
 
 | 语言 | 项目数量 | 占比 |
 |------|----------|------|
-| Python | 5 | 50.0% |
-| Rust | 2 | 20.0% |
+| TypeScript | 6 | 60.0% |
+| Python | 3 | 30.0% |
 | Go | 1 | 10.0% |
-| TypeScript | 1 | 10.0% |
-| Vue | 1 | 10.0% |
 
 ### 🕒 更新信息
 
-- **最后更新时间**: 2025-08-21 03:40:09
+- **最后更新时间**: 2025-08-22 03:40:30
 - **最近添加的项目**:
-  - [fiftyone](https://github.com/voxel51/fiftyone)
-  - [ComfyUI](https://github.com/comfyanonymous/ComfyUI)
-  - [streamlit](https://github.com/streamlit/streamlit)
-  - [todo-vue](https://github.com/mdn/todo-vue)
-  - [rolldown](https://github.com/rolldown/rolldown)
+  - [VChart](https://github.com/VisActor/VChart)
+  - [dify](https://github.com/langgenius/dify)
+  - [erpnext](https://github.com/frappe/erpnext)
+  - [coder](https://github.com/coder/coder)
+  - [supabase](https://github.com/supabase/supabase)
 
 📋 [查看完整分类索引](docs/index.md)
 
