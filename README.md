@@ -28,19 +28,24 @@
 
 | 语言 | 项目数量 | 占比 |
 |------|----------|------|
-| TypeScript | 6 | 60.0% |
 | Python | 3 | 30.0% |
+| Shell | 1 | 10.0% |
 | Go | 1 | 10.0% |
+| C++ | 1 | 10.0% |
+| Dart | 1 | 10.0% |
+| Ruby | 1 | 10.0% |
+| Java | 1 | 10.0% |
+| Rust | 1 | 10.0% |
 
 ### 🕒 更新信息
 
-- **最后更新时间**: 2025-08-22 03:40:30
+- **最后更新时间**: 2025-08-23 03:35:10
 - **最近添加的项目**:
-  - [VChart](https://github.com/VisActor/VChart)
-  - [dify](https://github.com/langgenius/dify)
-  - [erpnext](https://github.com/frappe/erpnext)
-  - [coder](https://github.com/coder/coder)
-  - [supabase](https://github.com/supabase/supabase)
+  - [enhanced-FaaS-in-China](https://github.com/xingpingcn/enhanced-FaaS-in-China)
+  - [codex](https://github.com/openai/codex)
+  - [new-pac](https://github.com/Alvin9999/new-pac)
+  - [Xed-Editor](https://github.com/Xed-Editor/Xed-Editor)
+  - [MoviePilot](https://github.com/jxxghp/MoviePilot)
 
 📋 [查看完整分类索引](docs/index.md)
 
