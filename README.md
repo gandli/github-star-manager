@@ -28,24 +28,22 @@
 
 | 语言 | 项目数量 | 占比 |
 |------|----------|------|
-| Python | 3 | 30.0% |
-| Shell | 1 | 10.0% |
-| Go | 1 | 10.0% |
-| C++ | 1 | 10.0% |
-| Dart | 1 | 10.0% |
+| TypeScript | 3 | 30.0% |
+| Go | 2 | 20.0% |
+| Python | 2 | 20.0% |
 | Ruby | 1 | 10.0% |
-| Java | 1 | 10.0% |
-| Rust | 1 | 10.0% |
+| C++ | 1 | 10.0% |
+| Swift | 1 | 10.0% |
 
 ### 🕒 更新信息
 
-- **最后更新时间**: 2025-08-23 03:35:10
+- **最后更新时间**: 2025-08-24 03:47:51
 - **最近添加的项目**:
-  - [enhanced-FaaS-in-China](https://github.com/xingpingcn/enhanced-FaaS-in-China)
-  - [codex](https://github.com/openai/codex)
-  - [new-pac](https://github.com/Alvin9999/new-pac)
-  - [Xed-Editor](https://github.com/Xed-Editor/Xed-Editor)
-  - [MoviePilot](https://github.com/jxxghp/MoviePilot)
+  - [taro](https://github.com/NervJS/taro)
+  - [recharts](https://github.com/recharts/recharts)
+  - [bytebase](https://github.com/bytebase/bytebase)
+  - [axolotl](https://github.com/axolotl-ai-cloud/axolotl)
+  - [tinygrad](https://github.com/tinygrad/tinygrad)
 
 📋 [查看完整分类索引](docs/index.md)
 
