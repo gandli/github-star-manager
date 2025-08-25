@@ -28,22 +28,20 @@
 
 | 语言 | 项目数量 | 占比 |
 |------|----------|------|
-| TypeScript | 3 | 30.0% |
-| Go | 2 | 20.0% |
-| Python | 2 | 20.0% |
-| Ruby | 1 | 10.0% |
-| C++ | 1 | 10.0% |
-| Swift | 1 | 10.0% |
+| TypeScript | 6 | 60.0% |
+| Vue | 2 | 20.0% |
+| Python | 1 | 10.0% |
+| Zig | 1 | 10.0% |
 
 ### 🕒 更新信息
 
-- **最后更新时间**: 2025-08-24 03:47:51
+- **最后更新时间**: 2025-08-25 03:47:27
 - **最近添加的项目**:
-  - [taro](https://github.com/NervJS/taro)
-  - [recharts](https://github.com/recharts/recharts)
-  - [bytebase](https://github.com/bytebase/bytebase)
-  - [axolotl](https://github.com/axolotl-ai-cloud/axolotl)
-  - [tinygrad](https://github.com/tinygrad/tinygrad)
+  - [lobe-chat](https://github.com/lobehub/lobe-chat)
+  - [InvokeAI](https://github.com/invoke-ai/InvokeAI)
+  - [bun](https://github.com/oven-sh/bun)
+  - [midscene](https://github.com/web-infra-dev/midscene)
+  - [mihomo-party](https://github.com/mihomo-party-org/mihomo-party)
 
 📋 [查看完整分类索引](docs/index.md)
 
