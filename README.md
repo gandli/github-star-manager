@@ -28,20 +28,22 @@
 
 | 语言 | 项目数量 | 占比 |
 |------|----------|------|
-| TypeScript | 6 | 60.0% |
-| Vue | 2 | 20.0% |
-| Python | 1 | 10.0% |
+| TypeScript | 3 | 30.0% |
+| Go | 2 | 20.0% |
+| C++ | 2 | 20.0% |
 | Zig | 1 | 10.0% |
+| Swift | 1 | 10.0% |
+| Rust | 1 | 10.0% |
 
 ### 🕒 更新信息
 
-- **最后更新时间**: 2025-08-25 03:47:27
+- **最后更新时间**: 2025-08-26 03:41:16
 - **最近添加的项目**:
-  - [lobe-chat](https://github.com/lobehub/lobe-chat)
-  - [InvokeAI](https://github.com/invoke-ai/InvokeAI)
+  - [dify](https://github.com/langgenius/dify)
+  - [zed](https://github.com/zed-industries/zed)
+  - [XcodesApp](https://github.com/XcodesOrg/XcodesApp)
   - [bun](https://github.com/oven-sh/bun)
-  - [midscene](https://github.com/web-infra-dev/midscene)
-  - [mihomo-party](https://github.com/mihomo-party-org/mihomo-party)
+  - [genai-toolbox](https://github.com/googleapis/genai-toolbox)
 
 📋 [查看完整分类索引](docs/index.md)
 
