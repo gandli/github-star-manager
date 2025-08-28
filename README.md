@@ -28,21 +28,19 @@
 
 | 语言 | 项目数量 | 占比 |
 |------|----------|------|
-| Python | 4 | 40.0% |
-| TypeScript | 3 | 30.0% |
-| Rust | 1 | 10.0% |
-| JavaScript | 1 | 10.0% |
-| PowerShell | 1 | 10.0% |
+| TypeScript | 6 | 60.0% |
+| Python | 3 | 30.0% |
+| C# | 1 | 10.0% |
 
 ### 🕒 更新信息
 
-- **最后更新时间**: 2025-08-27 03:34:40
+- **最后更新时间**: 2025-08-28 03:34:48
 - **最近添加的项目**:
-  - [winget-pkgs](https://github.com/microsoft/winget-pkgs)
-  - [undici](https://github.com/nodejs/undici)
-  - [teable](https://github.com/teableio/teable)
-  - [OpenHands](https://github.com/All-Hands-AI/OpenHands)
-  - [dify](https://github.com/langgenius/dify)
+  - [pytorch](https://github.com/pytorch/pytorch)
+  - [Roo-Code](https://github.com/RooCodeInc/Roo-Code)
+  - [superset](https://github.com/apache/superset)
+  - [PowerToys](https://github.com/microsoft/PowerToys)
+  - [gemini-cli](https://github.com/google-gemini/gemini-cli)
 
 📋 [查看完整分类索引](docs/index.md)
 
