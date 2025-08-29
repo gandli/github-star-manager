@@ -28,19 +28,23 @@
 
 | 语言 | 项目数量 | 占比 |
 |------|----------|------|
-| TypeScript | 6 | 60.0% |
-| Python | 3 | 30.0% |
-| C# | 1 | 10.0% |
+| TypeScript | 4 | 40.0% |
+| Dart | 1 | 10.0% |
+| C++ | 1 | 10.0% |
+| JavaScript | 1 | 10.0% |
+| Svelte | 1 | 10.0% |
+| Rust | 1 | 10.0% |
+| Python | 1 | 10.0% |
 
 ### 🕒 更新信息
 
-- **最后更新时间**: 2025-08-28 03:34:48
+- **最后更新时间**: 2025-08-29 03:34:23
 - **最近添加的项目**:
-  - [pytorch](https://github.com/pytorch/pytorch)
-  - [Roo-Code](https://github.com/RooCodeInc/Roo-Code)
-  - [superset](https://github.com/apache/superset)
-  - [PowerToys](https://github.com/microsoft/PowerToys)
-  - [gemini-cli](https://github.com/google-gemini/gemini-cli)
+  - [cherry-studio](https://github.com/CherryHQ/cherry-studio)
+  - [new-pac](https://github.com/Alvin9999/new-pac)
+  - [Seelen-UI](https://github.com/eythaann/Seelen-UI)
+  - [cobalt](https://github.com/imputnet/cobalt)
+  - [vscode](https://github.com/microsoft/vscode)
 
 📋 [查看完整分类索引](docs/index.md)
 
