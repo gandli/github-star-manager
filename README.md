@@ -28,23 +28,22 @@
 
 | 语言 | 项目数量 | 占比 |
 |------|----------|------|
-| TypeScript | 4 | 40.0% |
-| Dart | 1 | 10.0% |
-| C++ | 1 | 10.0% |
-| JavaScript | 1 | 10.0% |
-| Svelte | 1 | 10.0% |
-| Rust | 1 | 10.0% |
-| Python | 1 | 10.0% |
+| JavaScript | 3 | 30.0% |
+| TypeScript | 2 | 20.0% |
+| Python | 2 | 20.0% |
+| Go | 1 | 10.0% |
+| Tcl | 1 | 10.0% |
+| Vue | 1 | 10.0% |
 
 ### 🕒 更新信息
 
-- **最后更新时间**: 2025-08-29 03:34:23
+- **最后更新时间**: 2025-08-30 03:29:35
 - **最近添加的项目**:
-  - [cherry-studio](https://github.com/CherryHQ/cherry-studio)
-  - [new-pac](https://github.com/Alvin9999/new-pac)
-  - [Seelen-UI](https://github.com/eythaann/Seelen-UI)
-  - [cobalt](https://github.com/imputnet/cobalt)
-  - [vscode](https://github.com/microsoft/vscode)
+  - [Nettacker](https://github.com/OWASP/Nettacker)
+  - [md](https://github.com/doocs/md)
+  - [docsify](https://github.com/docsifyjs/docsify)
+  - [mcp-containers](https://github.com/metorial/mcp-containers)
+  - [pipecat](https://github.com/pipecat-ai/pipecat)
 
 📋 [查看完整分类索引](docs/index.md)
 
